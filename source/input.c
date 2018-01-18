@@ -862,6 +862,8 @@ int input_read_parameters(
   // fprintf(stdout, "you have chosen Gamma = %e*H0, tau = %e s \n",pba->Gamma_dcdm/(1.e3 / _c_)/67,param2);
   }
 
+  /** Input parameters relative to DE-baryon scattering */
+  class_read_double("u_bscf",pth->u_bscf); /** interaction rate */
   /** Input parameters relative to DM-baryon scattering */
   class_read_double("u_gcdm",pth->u_gcdm); /** interaction rate */
 
@@ -3549,6 +3551,7 @@ int input_default_params(
   pth->PBH_relative_velocities = -1 ; //Standard value is the linear result extrapolated to PBH.
   pth->energy_repart_functions = Galli_et_al_fit;
   pth->u_gcdm=0.;
+  pth->u_bscf=0.;
   pth->beta_gcdm=0.;
   pth->alpha_gcdm=0.;
   pth->A_21_over_mchi=0.;

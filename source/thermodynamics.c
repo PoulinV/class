@@ -253,36 +253,40 @@ int thermodynamics_at_z(
 
 
     }
-    // else if(pth->sigma_gde != 0){
-    //
-    //   /* Calculate dmu/dtau (dmu/dtau = a n_cdm sigma_gcdm = a^{-2} n_cdm(today) sigma_gcdm in units of 1/Mpc, where sigma_cdm = u_gcdm sigma_T 10^-11 GeV m_cdm. Also need to use Omega0_cdm = rho0_cdm / rho0_crit) */
-    //   pvecthermo[pth->index_th_dmu_gde] = (3./8./_PI_/_G_*_sigma_/1.e11/_eV_*pow(_c_,4))/_Mpc_over_m_*pth->u_gcdm
-    //   *(1.+z)*(1.+z)*pba->Omega0_cdm*pow(pba->H0,2);
-    //
-    //   /* Calculate d2mu/dtau2 = dz/dtau d/dz[dmu/dtau] given that [dmu/dtau] proportional to (1+z)^2 and dz/dtau = -H */
-    //   pvecthermo[pth->index_th_ddmu_gcdm] = -pvecback[pba->index_bg_H] * 2. / (1.+z) * pvecthermo[pth->index_th_dmu_gcdm];
-    //
-    //   /* Calculate d3mu/dtau3 given that [dmu/dtau] proportional to (1+z)^2 */
-    //   pvecthermo[pth->index_th_dddmu_gcdm] = (pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]/ (1.+z) - pvecback[pba->index_bg_H_prime]) * 2. / (1.+z) * pvecthermo[pth->index_th_dmu_gcdm];
-    //
-    //   /* extrapolate exp_m_mu_gcdm using the fact that mu' goes like (1+z)^2 */
-    //   pvecthermo[pth->index_th_exp_m_mu_gcdm] =
-    //   exp(pvecthermo[pth->index_th_dmu_gcdm]/(1+z)
-    //       /pth->thermodynamics_table[(pth->tt_size-1)*pth->th_size+pth->index_th_dmu_gcdm]
-    //       *(1+pth->z_table[pth->tt_size-1])
-    //       *log(pth->thermodynamics_table[(pth->tt_size-1)*pth->th_size+pth->index_th_exp_m_mu_gcdm]));
-    //   /* boltzmann, line of sight integration */
-    //
-    //
-    //   // fprintf(stdout, "z %e pvecthermo[pth->index_th_dmu_gcdm]%e   pvecthermo[pth->index_th_ddmu_gcdm] %e pvecthermo[pth->index_th_dddmu_gcdm]  %e pvecthermo[pth->index_th_exp_m_mu_gcdm] %e  pth->u_gcdm %e\n",z,pth->u_gcdm,pvecthermo[pth->index_th_dmu_gcdm],  pvecthermo[pth->index_th_ddmu_gcdm],pvecthermo[pth->index_th_dddmu_gcdm] ,pvecthermo[pth->index_th_exp_m_mu_gcdm]);
-    //
-    // }
     // else {
     // 	pvecthermo[pth->index_th_dmu_gcdm] = 0;
     // 	pvecthermo[pth->index_th_ddmu_gcdm] =0;
     // 	pvecthermo[pth->index_th_dddmu_gcdm] = 0;
     // 	pvecthermo[pth->index_th_exp_m_mu_gcdm] = 1;
     // }
+    /* if necessary, computes equivalent functions from bayon-DE scattering */
+    // 
+    // if(pth->u_bscf != 0){
+    //
+    //   /* Calculate dmu/dtau (dmu/dtau = a n_cdm sigma_gcdm = a^{-2} n_cdm(today) sigma_gcdm in units of 1/Mpc, where sigma_cdm = u_gcdm sigma_T 10^-11 GeV m_cdm. Also need to use Omega0_cdm = rho0_cdm / rho0_crit) */
+    //   pvecthermo[pth->index_th_dmu_bscf] = (3./8./_PI_/_G_*_sigma_/1.e11/_eV_*pow(_c_,4))/_Mpc_over_m_*pth->u_bscf
+    //   *(1.+z)*(1.+z)*pba->Omega0_b*pow(pba->H0,2);
+    //
+    //   /* Calculate d2mu/dtau2 = dz/dtau d/dz[dmu/dtau] given that [dmu/dtau] proportional to (1+z)^2 and dz/dtau = -H */
+    //   pvecthermo[pth->index_th_ddmu_bscf] = -pvecback[pba->index_bg_H] * 2. / (1.+z) * pvecthermo[pth->index_th_dmu_bscf];
+    //
+    //   /* Calculate d3mu/dtau3 given that [dmu/dtau] proportional to (1+z)^2 */
+    //   pvecthermo[pth->index_th_dddmu_bscf] = (pvecback[pba->index_bg_H]*pvecback[pba->index_bg_H]/ (1.+z) - pvecback[pba->index_bg_H_prime]) * 2. / (1.+z) * pvecthermo[pth->index_th_dmu_bscf];
+    //
+    //   /* extrapolate exp_m_mu_bscf using the fact that mu' goes like (1+z)^2 */
+    //   pvecthermo[pth->index_th_exp_m_mu_bscf] =
+    //   exp(pvecthermo[pth->index_th_dmu_bscf]/(1+z)
+    //       /pth->thermodynamics_table[(pth->tt_size-1)*pth->th_size+pth->index_th_dmu_bscf]
+    //       *(1+pth->z_table[pth->tt_size-1])
+    //       *log(pth->thermodynamics_table[(pth->tt_size-1)*pth->th_size+pth->index_th_exp_m_mu_bscf]));
+    //   /* boltzmann, line of sight integration */
+    //
+    //
+    //   // fprintf(stdout, "z %e pvecthermo[pth->index_th_dmu_gcdm]%e   pvecthermo[pth->index_th_ddmu_gcdm] %e pvecthermo[pth->index_th_dddmu_gcdm]  %e pvecthermo[pth->index_th_exp_m_mu_gcdm] %e  pth->u_gcdm %e\n",z,pth->u_gcdm,pvecthermo[pth->index_th_dmu_gcdm],  pvecthermo[pth->index_th_ddmu_gcdm],pvecthermo[pth->index_th_dddmu_gcdm] ,pvecthermo[pth->index_th_exp_m_mu_gcdm]);
+    //
+    // }
+
+
 
     /* Calculate Tb */
     pvecthermo[pth->index_th_Tb] = pba->T_cmb*(1.+z);
@@ -817,6 +821,8 @@ int thermodynamics_init(
                    pth->error_message,
                    pth->error_message);
 
+
+
         /** check loop */
         // for (index_tau=pth->tt_size-1; index_tau>=0; index_tau-=100) {
         //   if(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dmu_gcdm] != 0)fprintf(stdout, " %e %e %e %e %e %e %e %e %e\n",pth->z_table[index_tau], pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dmu_gcdm], pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_ddmu_gcdm], pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dddmu_gcdm], pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_exp_m_mu_gcdm],
@@ -930,6 +936,9 @@ int thermodynamics_init(
            +fabs(pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dddkappa]/
                  pth->thermodynamics_table[index_tau*pth->th_size+pth->index_th_dkappa]));
 
+
+
+
   }
 
   /** - smooth the rate (details of smoothing unimportant: only the
@@ -942,6 +951,9 @@ int thermodynamics_init(
                           pth->error_message),
              pth->error_message,
              pth->error_message);
+
+
+
 
   /** - fill tables of second derivatives with respect to z (in view of spline interpolation) */
 

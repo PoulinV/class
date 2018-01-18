@@ -6890,9 +6890,10 @@ int perturb_derivs(double tau,
   /* for use with dcdm and dr */
   double f_dr, fprime_dr;
 
-  /* in case of DM-baryon interactions */
+  /* in case of photon-baryon interactions */
   double dmu_gcdm;
-
+  /* in case of DE-baryon interactions */
+  double dmu_bscf, Sinv_bscf;
   /** - rename the fields of the input structure (just to avoid heavy notations) */
 
   pppaw = parameters_and_workspace;
@@ -6953,8 +6954,14 @@ int perturb_derivs(double tau,
   a_prime_over_a = pvecback[pba->index_bg_H] * a;
   R = 4./3. * pvecback[pba->index_bg_rho_g]/pvecback[pba->index_bg_rho_b];
   Sinv = 4./3. * pvecback[pba->index_bg_rho_g]/pvecback[pba->index_bg_rho_cdm];
+  class_call(background_w_fld(pba,a,&w_fld,&dw_over_da_fld,&integral_fld), pba->error_message, ppt->error_message);
+  Sinv_bscf =  (1+w_fld)*pvecback[pba->index_bg_rho_fld]/pvecback[pba->index_bg_rho_b];
   if(pth->u_gcdm != 0. || pth->beta_gcdm != 0.) dmu_gcdm = pvecthermo[pth->index_th_dmu_gcdm];
   else dmu_gcdm = 0;
+  if(pth->u_bscf != 0 && pba->has_fld == _TRUE_ && pba->use_ppf == _FALSE_)dmu_bscf =  (3./8./_PI_/_G_*_sigma_/1.e11/_eV_*pow(_c_,4))/_Mpc_over_m_*pth->u_bscf
+  /a/a*pba->Omega0_b*pow(pba->H0,2);
+  else dmu_bscf = 0;
+  // printf("dmu_bscf %e \n", dmu_bscf);
   /** - Compute 'generalised cotK function of argument \f$ \sqrt{|K|}*\tau \f$, for closing hierarchy.
       (see equation 2.34 in arXiv:1305.3261): */
   if (pba->has_curvature == _FALSE_){
@@ -7088,6 +7095,8 @@ int perturb_derivs(double tau,
         + metric_euler
         + k2*cb2*(delta_b+delta_temp)
         + R*pvecthermo[pth->index_th_dkappa]*(theta_g-theta_b);
+
+      if(pth->u_bscf != 0 && pba->has_fld == _TRUE_ && pba->use_ppf == _FALSE_)dy[pv->index_pt_theta_b] -= Sinv_bscf*dmu_bscf*(y[pv->index_pt_theta_b]-y[pv->index_pt_theta_fld]);
     }
 
     else {
@@ -7104,6 +7113,8 @@ int perturb_derivs(double tau,
          +R*ppw->tca_slip)/(1.+R)
         +metric_euler;
       if(dmu_gcdm!=0) dy[pv->index_pt_theta_b]-=  R*dmu_gcdm*(theta_g-y[pv->index_pt_theta_cdm])/(1.+R);
+      if(pth->u_bscf != 0 && pba->has_fld == _TRUE_ && pba->use_ppf == _FALSE_) dy[pv->index_pt_theta_b] -= Sinv_bscf*dmu_bscf*(y[pv->index_pt_theta_b]-y[pv->index_pt_theta_fld]);
+
       // fprintf(stdout, " dmu_gcdm %e dy[pv->index_pt_theta_b] %e \n",dmu_gcdm, dy[pv->index_pt_theta_b]);
     }
 
@@ -7214,6 +7225,7 @@ int perturb_derivs(double tau,
 
         dy[pv->index_pt_theta_cdm] = - a_prime_over_a*y[pv->index_pt_theta_cdm] + metric_euler; /* cdm velocity */
         if(pth->u_gcdm != 0. || pth->beta_gcdm != 0) dy[pv->index_pt_theta_cdm] -= Sinv*dmu_gcdm*(y[pv->index_pt_theta_cdm]-theta_g);
+
       }
 
       /** - ----> synchronous gauge: cdm density only (velocity set to zero by definition of the gauge) */
@@ -7299,7 +7311,6 @@ int perturb_derivs(double tau,
         /** - ----> factors w, w_prime, adiabatic sound speed ca2 (all three background-related),
             plus actual sound speed in the fluid rest frame cs2 */
 
-        class_call(background_w_fld(pba,a,&w_fld,&dw_over_da_fld,&integral_fld), pba->error_message, ppt->error_message);
         w_prime_fld = dw_over_da_fld * a_prime_over_a * a;
 
         ca2 = w_fld - w_prime_fld / 3. / (1.+w_fld) / a_prime_over_a;
@@ -7318,6 +7329,8 @@ int perturb_derivs(double tau,
           -(1.-3.*cs2)*a_prime_over_a*y[pv->index_pt_theta_fld]
           +cs2*k2/(1.+w_fld)*y[pv->index_pt_delta_fld]
           +metric_euler;
+
+        if(pth->u_bscf != 0 )dy[pv->index_pt_theta_fld] -= dmu_bscf*(y[pv->index_pt_theta_fld]-y[pv->index_pt_theta_b]);
       }
       else {
         dy[pv->index_pt_Gamma_fld] = ppw->Gamma_prime_fld; /* Gamma variable of PPF formalism */

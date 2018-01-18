@@ -294,6 +294,9 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
   double u_gcdm; /**< normalisation of interaction rate between
         baryons and cdm, same definition as in
         astro-ph/0112522, eq. (3.21) */
+  double u_bscf; /**< normalisation of interaction rate between
+        baryons and scf, same definition as in
+        astro-ph/0112522, eq. (3.21) */
 
   double alpha_gcdm; /* in case of excited DM: a_0 A_21 E_21^2 / (6 m_xhi T_0) in units of inverse Mpc */
   double beta_gcdm; /* in case of excited DM: E_21 / T_cmb^0 (dimensionless) */
@@ -303,6 +306,11 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
   int index_th_ddmu_gcdm;     /**< scattering rate derivative */
   int index_th_dddmu_gcdm;    /**< scattering rate second derivative */
   int index_th_exp_m_mu_gcdm; /**< \f$ exp^{-\mu} \f$ */
+
+  int index_th_dmu_bscf;      /**< DE-baryons scattering rate (units 1/Mpc) */
+  // int index_th_ddmu_bscf;     /**< scattering rate derivative */
+  // int index_th_dddmu_bscf;    /**< scattering rate second derivative */
+  // int index_th_exp_m_mu_bscf; /**< \f$ exp^{-\mu} \f$ */
   //@}
 
   /** @name - all indices for the vector of thermodynamical (=th) quantities stored in table */
