@@ -266,6 +266,8 @@ int background_functions(
   double rho_ncdm,p_ncdm,pseudo_p_ncdm;
   /* index for n_ncdm species */
   int n_ncdm;
+
+  int n;
   /* fluid's time-dependent equation of state parameter */
   double w_fld, dw_over_da, integral_fld;
   /* scale factor */
@@ -310,6 +312,19 @@ int background_functions(
     rho_m += pvecback[pba->index_bg_rho_cdm];
   }
 
+  /* TK added GDM here */
+  if (pba->has_gdm == _TRUE_) {
+    pvecback[pba->index_bg_rho_gdm] = pba->Omega0_gdm * pow(pba->H0,2) / pow(a_rel, 3*(1 + pba->w_gdm) );
+    rho_tot += pvecback[pba->index_bg_rho_gdm];
+    p_tot += (pba->w_gdm) * pvecback[pba->index_bg_rho_gdm];
+    if (pba->w_gdm > 0.33 && pba->w_gdm < 0.34)rho_r += pvecback[pba->index_bg_rho_gdm];
+    else rho_m += pvecback[pba->index_bg_rho_gdm];
+    // TK , VP : the following was only to try to debug GDM. It simply copies CDM
+    // pvecback[pba->index_bg_rho_gdm] = pba->Omega0_cdm * pow(pba->H0,2) / pow(a_rel, 3 );
+    // rho_tot += pvecback[pba->index_bg_rho_cdm];
+    // rho_m += pvecback[pba->index_bg_rho_cdm];
+
+  }
   /* dcdm */
   if (pba->has_dcdm == _TRUE_) {
     /* Pass value of rho_dcdm to output */
@@ -346,6 +361,8 @@ int background_functions(
     rho_r += 3.*pvecback[pba->index_bg_p_scf]; //field pressure contributes radiation
     rho_m += pvecback[pba->index_bg_rho_scf] - 3.* pvecback[pba->index_bg_p_scf]; //the rest contributes matter
     //printf(" a= %e, Omega_scf = %f, \n ",a_rel, pvecback[pba->index_bg_rho_scf]/rho_tot );
+
+
   }
 
   /* ncdm */
@@ -395,20 +412,22 @@ int background_functions(
 
   /* fluid with w(a) and constant cs2 */
   if (pba->has_fld == _TRUE_) {
+    for(n = 0 ; n<pba->n_fld ; n++){
+      /* get rho_fld from vector of integrated variables */
+      pvecback[pba->index_bg_rho_fld+n] = pvecback_B[pba->index_bi_rho_fld+n];
 
-    /* get rho_fld from vector of integrated variables */
-    pvecback[pba->index_bg_rho_fld] = pvecback_B[pba->index_bi_rho_fld];
+      /* get w_fld from dedicated function */
+      class_call(background_w_fld(pba,a,&w_fld,&dw_over_da,&integral_fld,n), pba->error_message, pba->error_message);
+      pvecback[pba->index_bg_w_fld+n] = w_fld;
+      pvecback[pba->index_bg_dw_fld+n] = dw_over_da/(1+w_fld);
+      // printf("a %e w_fld %e \n",a,w_fld);
+      // Obsolete: at the beginning, we had here the analytic integral solution corresponding to the case w=w0+w1(1-a/a0):
+      // pvecback[pba->index_bg_rho_fld] = pba->Omega0_fld * pow(pba->H0,2) / pow(a_rel,3.*(1.+pba->w0_fld+pba->wa_fld)) * exp(3.*pba->wa_fld*(a_rel-1.));
+      // But now everthing is integrated numerically for a given w_fld(a) defined in the function background_w_fld.
+      rho_tot += pvecback[pba->index_bg_rho_fld+n];
+      p_tot += w_fld * pvecback[pba->index_bg_rho_fld+n];
+    }
 
-    /* get w_fld from dedicated function */
-    class_call(background_w_fld(pba,a,&w_fld,&dw_over_da,&integral_fld), pba->error_message, pba->error_message);
-    pvecback[pba->index_bg_w_fld] = w_fld;
-
-    // Obsolete: at the beginning, we had here the analytic integral solution corresponding to the case w=w0+w1(1-a/a0):
-    // pvecback[pba->index_bg_rho_fld] = pba->Omega0_fld * pow(pba->H0,2) / pow(a_rel,3.*(1.+pba->w0_fld+pba->wa_fld)) * exp(3.*pba->wa_fld*(a_rel-1.));
-    // But now everthing is integrated numerically for a given w_fld(a) defined in the function background_w_fld.
-
-    rho_tot += pvecback[pba->index_bg_rho_fld];
-    p_tot += w_fld * pvecback[pba->index_bg_rho_fld];
   }
 
   /* relativistic neutrinos (and all relativistic relics) */
@@ -417,7 +436,9 @@ int background_functions(
     rho_tot += pvecback[pba->index_bg_rho_ur];
     p_tot += (1./3.) * pvecback[pba->index_bg_rho_ur];
     rho_r += pvecback[pba->index_bg_rho_ur];
+
   }
+  // if(pvecback[pba->index_bg_rho_fld]+pvecback[pba->index_bg_rho_cdm]>pvecback[pba->index_bg_rho_ur]+pvecback[pba->index_bg_rho_g])printf("a %e rho tot %e rho fld %e \n",a,rho_tot,pvecback[pba->index_bg_rho_fld]);
 
   /** - compute expansion rate H from Friedmann equation: this is the
       only place where the Friedmann equation is assumed. Remember
@@ -472,37 +493,509 @@ int background_w_fld(
                      double a,
                      double * w_fld,
                      double * dw_over_da_fld,
-                     double * integral_fld) {
+                     double * integral_fld,
+                     int n) {
 
-  /** - first, define the function w(a) */
-  *w_fld = pba->w0_fld + pba->wa_fld * (1. - a / pba->a_today);
+ double  a_rel = a/ pba->a_today;
+ double z = 1/a_rel-1;
+ double center, width, wbefore, wafter;
+ double w,dw,intw;
+ /* vector of background values for calling background_at_tau() */
+double * pvecback;
+double tau;
+/* index for calling background_at_tau() */
+int last_index_back;
 
-  /** - then, give the corresponding analytic derivative dw/da (used
-        by perturbation equations; we could compute it numerically,
-        but with a loss of precision; as long as there is a simple
-        analytic expression of the derivative of the previous
-        function, let's use it! */
-  *dw_over_da_fld = - pba->wa_fld / pba->a_today;
+  if(pba->w_fld_parametrization == CPL){
+    /** - first, define the function w(a) */
+    *w_fld = pba->w0_fld + pba->wa_fld * (1. - a / pba->a_today);
 
-  /** - finally, give the analytic solution of the following integral:
-        \f$ \int_{a}^{a0} da 3(1+w_{fld})/a \f$. This is used in only
-        one place, in the initial conditions for the background, and
-        with a=a_ini. If your w(a) does not lead to a simple analytic
-        solution of this integral, no worry: instead of writing
-        something here, the best would then be to leave it equal to
-        zero, and then in background_initial_conditions() you should
-        implement a numerical calculation of this integral only for
-        a=a_ini, using for instance Romberg integration. It should be
-        fast, simple, and accurate enough. */
-  *integral_fld = 3.*((1.+pba->w0_fld+pba->wa_fld)*log(pba->a_today/a) + pba->wa_fld*(a/pba->a_today-1.));
+    /** - then, give the corresponding analytic derivative dw/da (used
+          by perturbation equations; we could compute it numerically,
+          but with a loss of precision; as long as there is a simple
+          analytic expression of the derivative of the previous
+          function, let's use it! */
+    *dw_over_da_fld = - pba->wa_fld / pba->a_today;
 
-  /** note: of course you can generalise these formulas to anything,
-      defining new parameters pba->w..._fld. Just remember that so
-      far, HyRec explicitely assumes that w(a)= w0 + wa (1-a/a0); but
-      Recfast does not assume anything */
+    /** - finally, give the analytic solution of the following integral:
+          \f$ \int_{a}^{a0} da 3(1+w_{fld})/a \f$. This is used in only
+          one place, in the initial conditions for the background, and
+          with a=a_ini. If your w(a) does not lead to a simple analytic
+          solution of this integral, no worry: instead of writing
+          something here, the best would then be to leave it equal to
+          zero, and then in background_initial_conditions() you should
+          implement a numerical calculation of this integral only for
+          a=a_ini, using for instance Romberg integration. It should be
+          fast, simple, and accurate enough. */
+    *integral_fld = 3.*((1.+pba->w0_fld+pba->wa_fld)*log(pba->a_today/a) + pba->wa_fld*(a/pba->a_today-1.));
+    // printf("*integral_fld  %e w0_fld %e \n",*integral_fld,pba->w0_fld);
+    /** note: of course you can generalise these formulas to anything,
+        defining new parameters pba->w..._fld. Just remember that so
+        far, HyRec explicitely assumes that w(a)= w0 + wa (1-a/a0); but
+        Recfast does not assume anything */
+  }
+  else if(pba->w_fld_parametrization == pheno_axion){
+    w = (pba->n_pheno_axion[n]-1)/(1+pba->n_pheno_axion[n]);
+    *w_fld = (1+w)/(1+pow(pba->a_c[n]/a,3*(1+w)))-1+1e-10; //we add 1e-10 to avoid a crashing of the solver. Checked to be totally invisible.
+    // *w_fld = (pow(a/ pba->a_today,6) - pow(pba->a_c/ pba->a_today,6))/(pow(a/ pba->a_today,6) + pow(pba->a_c/ pba->a_today,6));
+    *dw_over_da_fld = 3*pow(a/pba->a_today,-1-3*(1+w))*pba->a_c[n]/ pba->a_today*(1+w)*(1+w)/pow((1 + pba->a_c[n]/pba->a_today*pow(a/ pba->a_today,-3*(1+w))),2);
+    *integral_fld = -(3*(1 + w)*(3*w*log(a/pba->a_today) + log(pow(a/pba->a_today,3) + pow(pba->a_c[n]/ pba->a_today,3)*pow(pba->a_c[n]/a,3*w)))/(3 + 3*w));
+    // printf("%e %e %e %e \n",a,*w_fld,*dw_over_da_fld,*integral_fld);
+  }
+  else if(pba->w_fld_parametrization == pheno_alternative){
+    z = 1/a-1;
+    center = 1/pba->a_c[n]-1;
+    width = 2*center/200;//found to work well at capturing the sharp transition
+    wbefore = -1;
+    wafter = (pba->n_pheno_axion[n]-1)/(1+pba->n_pheno_axion[n]);
+    *w_fld = (wbefore - wafter)*(tanh((z - center)/width) + 1)/2 + wafter;
+    // *w_fld = (pow(a/ pba->a_today,6) - pow(pba->a_c/ pba->a_today,6))/(pow(a/ pba->a_today,6) + pow(pba->a_c/ pba->a_today,6));
+    *dw_over_da_fld = (wbefore - wafter)* (1-pow(tanh((z - center)/width),2))/(2*width);
+    // printf("dw_over_da_fld %e\n", *dw_over_da_fld);
+    *integral_fld = 0; //to be computed numerically
+    // printf("%e %e %e %e \n",a,*w_fld,*dw_over_da_fld,*integral_fld);
+  }
+  // else if(pba->w_fld_parametrization == cos_axion){
+  //   *w_fld = cos(pba->mu_axion)+0.5;
+  //   *dw_over_da_fld = -sin();
+  //   *integral_fld = log((pow(pba->a_today,6)+pow(pba->a_c/ pba->a_today,6))/(pow(a/ pba->a_today,6)+pow(pba->a_c/ pba->a_today,6)));
+  //
+  //   // printf("%e %e %e %e \n",a,*w_fld,*dw_over_da_fld,*integral_fld);
+  // }
+  else if(pba->w_fld_parametrization == w_free_function){
+    if(pba->w_free_function_from_file == _TRUE_)interpolate_w_free_function_from_file_at_a(pba,a_rel,&w,&dw);
+    else interpolate_w_free_function_at_a(pba,a_rel,&w,&dw);
+    *w_fld = w+1e-10;
+    *dw_over_da_fld = dw;
+    *integral_fld=0; //will be computed later in background_init once and for all;
+  }
+  // printf("a_rel %e %e %e %e\n",a_rel,*w_fld,*dw_over_da_fld,*integral_fld);
+ else if(pba->w_fld_parametrization == w_scf_like_fluid){
+   class_alloc(pvecback,pba->bg_size*sizeof(double),pba->error_message);
+
+   class_call(background_tau_of_z(pba,
+                                  1/a-1,
+                                  &tau),
+              pba->error_message,
+              pba->error_message);
+
+   class_call(background_at_tau(pba,
+                                tau,
+                                pba->normal_info,
+                                pba->inter_closeby,
+                                &last_index_back,
+                                pvecback),
+              pba->error_message,
+              pba->error_message);
+   *w_fld = pvecback[pba->index_bg_w_fld];
+   *dw_over_da_fld = pvecback[pba->index_bg_dw_fld]/a/(a*pvecback[pba->index_bg_H]); //here in reality dw is taken with respect to dtau so we convert to dw_over_da
+   *integral_fld=0; //will be computed later in background_init once and for all;
+
+ }
 
   return _SUCCESS_;
 }
+
+
+
+int w_free_function_init( struct precision *ppr,
+                          struct background *pba
+                         ) {
+     FILE * fA = NULL;
+     char line[_LINE_LENGTH_MAX_];
+     char * left;
+
+     /* BEGIN: New variables related to the use of an external code to calculate the annihilation coefficients */
+     char arguments[_ARGUMENT_LENGTH_MAX_];
+     char command_with_arguments[2*_ARGUMENT_LENGTH_MAX_];
+     int status;
+     /* END */
+
+     int num_lines=0;
+     int array_line=0;
+
+     if(pba->w_free_function_from_file==_TRUE_){
+
+       class_open(fA,ppr->w_free_function_file, "r",pba->error_message);
+       pba->w_free_function_number_of_columns =  1;
+         /* go through each line */
+         while (fgets(line,_LINE_LENGTH_MAX_-1,fA) != NULL) {
+           /* eliminate blank spaces at beginning of line */
+           left=line;
+           while (left[0]==' ') {
+             left++;
+           }
+
+           /* check that the line is neither blank nor a comment. In
+              ASCII, left[0]>39 means that first non-blank charachter might
+              be the beginning of some data (it is not a newline, a #, a %,
+              etc.) */
+           if (left[0] > 39) {
+
+             /* if the line contains data, we must interprete it. If
+                num_lines == 0 , the current line must contain
+                its value. Otherwise, it must contain (z,w,dw). */
+             if (num_lines == 0) {
+
+               /* read num_lines, infer size of arrays and allocate them */
+               class_test(sscanf(line,"%d",&num_lines) != 1,
+                          pba->error_message,
+                          "could not read value of parameters num_lines in file %s\n",ppr->w_free_function_file);
+               class_alloc(pba->w_free_function_redshift_at_knot,num_lines*sizeof(double),pba->error_message);
+               class_alloc(pba->w_free_function_at_knot,num_lines*sizeof(double),pba->error_message);
+               class_alloc(pba->w_free_function_d_at_knot,num_lines*sizeof(double),pba->error_message);
+               class_alloc(pba->w_free_function_dd_at_knot,num_lines*sizeof(double),pba->error_message);
+               class_alloc(pba->w_free_function_ddd_at_knot,num_lines*sizeof(double),pba->error_message);
+               pba->w_free_function_number_of_knots = num_lines;
+
+
+               array_line=0;
+
+             }
+             else {
+
+               /* read coefficients */
+               class_test(sscanf(line,"%lg %lg %lg ",
+                                 &(pba->w_free_function_redshift_at_knot[array_line]),
+                                 &(pba->w_free_function_at_knot[array_line]),
+                                 &(pba->w_free_function_d_at_knot[array_line])) != 3,
+                          pba->error_message,
+                          "could not read value of parameters coefficients in file %s\n",ppr->w_free_function_file);
+               array_line ++;
+             }
+           }
+         }
+         fclose(fA);
+           /* spline in one dimension */
+           class_call(array_spline_table_lines(pba->w_free_function_redshift_at_knot,
+                                               num_lines,
+                                               pba->w_free_function_at_knot,
+                                               1,
+                                               pba->w_free_function_dd_at_knot,
+                                               _SPLINE_NATURAL_,
+                                               pba->error_message),
+                      pba->error_message,
+                      pba->error_message);
+
+           class_call(array_spline_table_lines(pba->w_free_function_redshift_at_knot,
+                                               num_lines,
+                                               pba->w_free_function_d_at_knot,
+                                               1,
+                                               pba->w_free_function_ddd_at_knot,
+                                               _SPLINE_NATURAL_,
+                                               pba->error_message),
+                      pba->error_message,
+                      pba->error_message);
+
+
+     }
+     else{
+       /** - --> second derivative with respect to tau of rho_w_free_function (in view of spline interpolation) */
+       class_call(array_spline_table_line_to_line(pba->w_free_function_redshift_at_knot,
+                                                  pba->w_free_function_number_of_knots,
+                                                  pba->w_free_function_at_knot,
+                                                  pba->w_free_function_number_of_columns,
+                                                  0,
+                                                  2,
+                                                  _SPLINE_NATURAL_,
+                                                  pba->error_message),
+                  pba->error_message,
+                  pba->error_message);
+       /** - --> first derivative with respect to tau of rho_w_free_function (using spline interpolation) */
+       class_call(array_derive_spline_table_line_to_line(pba->w_free_function_redshift_at_knot,
+                                                         pba->w_free_function_number_of_knots,
+                                                         pba->w_free_function_at_knot,
+                                                         pba->w_free_function_number_of_columns,
+                                                         0,
+                                                         2,
+                                                         1,
+                                                         pba->error_message),
+                  pba->error_message,
+                  pba->error_message);
+
+        /** - --> third derivative with respect to tau of rho_w_free_function (in view of spline interpolation) */
+        class_call(array_spline_table_line_to_line(pba->w_free_function_redshift_at_knot,
+                                                   pba->w_free_function_number_of_knots,
+                                                   pba->w_free_function_at_knot,
+                                                   pba->w_free_function_number_of_columns,
+                                                   1,
+                                                   3,
+                                                   _SPLINE_NATURAL_,
+                                                   pba->error_message),
+                   pba->error_message,
+                   pba->error_message);
+
+        /** - --> if necessary, fill a table of secondary derivative in view of spline interpolation */
+        if(pba->w_free_function_interpolation_is_linear == _FALSE_){
+          class_call(array_spline_table_lines(pba->w_free_function_redshift_at_knot,
+                                              pba->w_free_function_number_of_knots,
+                                              pba->w_free_function_at_knot,
+                                             pba->w_free_function_number_of_columns,
+                                             pba->w_free_function_dd_at_knot,
+                                             _SPLINE_EST_DERIV_,
+                                             pba->error_message),
+                      pba->error_message,
+                      pba->error_message);
+        }
+
+     }
+
+        // for(int i=0;i<pba->w_free_function_number_of_knots*pba->w_free_function_number_of_columns;i++){
+        //   printf("pba->w_free_function_at_knot %e\n",pba->w_free_function_at_knot[i]);
+        // }
+     return _SUCCESS_;
+}
+
+double integrand_fld_free_function(struct background * pba,
+                                   double a,
+                                   int is_log,
+                                   int n_fld){
+
+ double tmp_w,tmp_dw,tmp_integral_fld; //temporary storing quantities
+ if(pba->w_fld_parametrization == w_free_function){
+   if(pba->w_free_function_from_file == _TRUE_)interpolate_w_free_function_from_file_at_a(pba,a,&tmp_w,&tmp_dw);
+   else interpolate_w_free_function_at_a(pba,a,&tmp_w,&tmp_dw);
+ }
+ else if(pba->w_fld_parametrization == pheno_alternative){
+   class_call(background_w_fld(pba,a,&tmp_w,&tmp_dw,&tmp_integral_fld,n_fld), pba->error_message, pba->error_message);
+ }
+
+
+ if(is_log==_TRUE_)return 3*(1+tmp_w); //we integrate in loga;
+ else return 3*(1+tmp_w)/a;
+}
+// int simpson_integrate_w_free_function(struct background * pba,
+//                                          double /*lower limit*/ a,
+//                                          double /*upper limit*/ b,
+//                                          size_t max_steps,
+//                                          // double /*desired accuracy*/ acc,
+//                                          double *intw_fld){
+//    double h = (b-a)/6, s;
+//    int i=1;
+//    s = (integrand_fld_free_function(pba,pow(10,a),is_)+integrand_fld_free_function(pba,pow(10,b)));
+//    while(i<max_steps){
+//      s += 4 * integrand_fld_free_function(pba,pow(10,(a + i * h)));
+//      i+=2;
+//    }
+//    i=2;
+//    while(i<max_steps-1){
+//      s += 2 * integrand_fld_free_function(pba,pow(10,(a + i * h)));
+//      i+=2;
+//    }
+//
+//    *intw_fld = s*h/3;
+//    return _SUCCESS_;
+// }
+int romberg_integrate_w_free_function(struct background * pba,
+                                         double /*lower limit*/ a,
+                                         double /*upper limit*/ b,
+                                         size_t max_steps,
+                                         double /*desired accuracy*/ acc,
+                                         double *intw_fld,
+                                         int is_log,
+                                         int n){
+   double R1[max_steps], R2[max_steps]; //buffers
+   double *Rp = &R1[0], *Rc = &R2[0]; //Rp is previous row, Rc is current row
+   double h = (b-a); //step size
+   double x,xa=a,xb=b;
+   size_t i;
+   size_t j;
+   if(is_log == _TRUE_){
+     xa=pow(10,xa);
+     xb=pow(10,xb);
+   }
+   Rp[0] = (integrand_fld_free_function(pba,xa,is_log,n)+integrand_fld_free_function(pba,xb,is_log,n))*h*.5; //first trapezoidal step
+   // dump_row(0, Rp);
+
+   for( i = 1; i < max_steps; ++i){
+      h /= 2.;
+      double c = 0;
+      size_t ep = 1 << (i-1); //2^(n-1)
+      for(j = 1; j <= ep; ++j){
+         x = a+(2*j-1)*h;
+         // printf("is_log %d x %e\n", is_log, x);
+         if(is_log == _TRUE_){
+           x=pow(10,x);
+           // printf(" x %e j %d ep %d n", x,j,ep);
+         }
+         c += integrand_fld_free_function(pba,x,is_log,n);
+         // printf("c %e x %e j %d ep %d \n", c, x,j,ep);
+      }
+      Rc[0] = h*c + .5*Rp[0]; //R(i,0)
+
+      for(j = 1; j <= i; ++j){
+         double n_k = pow(4, j);
+         Rc[j] = (n_k*Rc[j-1] - Rp[j-1])/(n_k-1); //compute R(i,j)
+      }
+
+      //Dump ith column of R, R[i,i] is the best estimate so far
+      // dump_row(i, Rc);
+
+      if(i > 1 && fabs(Rp[i-1]-Rc[i]) < acc){
+         *intw_fld = Rc[i-1];
+         return _SUCCESS_;
+      }
+
+      //swap Rn and Rc as we only need the last row
+      double *rt = Rp;
+      Rp = Rc;
+      Rc = rt;
+   }
+   // printf("Rp[max_steps-1] %e\n",Rp[max_steps-1]);
+   *intw_fld = Rp[max_steps-1]; //return our best guess
+
+   return _SUCCESS_;
+}
+
+int interpolate_w_free_function_from_file_at_a(
+                                               struct background * pba,
+                                               double a,
+                                               double *w_fld,
+                                               double *dw_fld
+                                               ) {
+
+  int last_index,i;
+  double z=1e14;
+  if(a!=0) z=1./a-1;
+  double tmp_w,tmp_dw;
+  // printf("z %e\n",z);
+  // if(z==1e14)for(i = 0;i<pba->w_free_function_number_of_knots;i++){
+  //   printf("%e %e %e\n",pba->w_free_function_redshift_at_knot[i],pba->w_free_function_at_knot[i],pba->w_free_function_d_at_knot[i]);
+  // }
+
+  if(pba->w_free_function_interpolation_is_linear == _TRUE_){
+      class_call(array_interpolate_linear(pba->w_free_function_redshift_at_knot,
+                                       pba->w_free_function_number_of_knots,
+                                       pba->w_free_function_at_knot,
+                                       1,
+                                       z,
+                                       &last_index,
+                                       &tmp_w,
+                                       1,
+                                       pba->error_message),
+              pba->error_message,
+              pba->error_message);
+      class_call(array_interpolate_linear(pba->w_free_function_redshift_at_knot,
+                                       pba->w_free_function_number_of_knots,
+                                       pba->w_free_function_d_at_knot,
+                                       1,
+                                       z,
+                                       &last_index,
+                                       &tmp_dw,
+                                       1,
+                                       pba->error_message),
+              pba->error_message,
+              pba->error_message);
+    }
+    else{
+      class_call(array_interpolate_spline(pba->w_free_function_redshift_at_knot,
+                                          pba->w_free_function_number_of_knots,
+                                          pba->w_free_function_at_knot,
+                                          pba->w_free_function_dd_at_knot,
+                                          1,
+                                          z,
+                                          &last_index,
+                                          w_fld,
+                                          1,
+                                          pba->error_message),
+                 pba->error_message,
+                 pba->error_message);
+
+      class_call(array_interpolate_spline(pba->w_free_function_redshift_at_knot,
+                                          pba->w_free_function_number_of_knots,
+                                          pba->w_free_function_d_at_knot,
+                                          pba->w_free_function_ddd_at_knot,
+                                          1,
+                                          z,
+                                          &last_index,
+                                          dw_fld,
+                                          1,
+                                          pba->error_message),
+                 pba->error_message,
+                 pba->error_message);
+    }
+  *w_fld=tmp_w;
+  *dw_fld=tmp_dw;
+        // printf("pba->w_free_function_number_of_knots %d\n", pba->w_free_function_number_of_knots);
+  // printf("z %e %e %e pba->w_free_function_number_of_knots %d \n",z,*w_fld,*dw_fld,pba->w_free_function_number_of_knots);
+  return _SUCCESS_;
+
+}
+
+int interpolate_w_free_function_at_a(
+                          struct background * pba,
+                          double a,
+                          double *w_fld,
+                          double *dw_fld
+                          ) {
+
+  int last_index;
+  double z;
+  double epsilon = 1e-14;
+  if (a!=0.) z = pba->a_today/a-1.;
+  else z = pba->a_today/(epsilon)-1.;
+  double result[pba->w_free_function_number_of_columns];
+  int i,n;
+
+  if(z > pba->w_free_function_logz_interpolation_above_z && pba->w_free_function_table_is_log == _FALSE_ && pba->w_free_function_redshift_at_knot[pba->w_free_function_number_of_knots-1]>20){
+      for(i = 0 ; i < pba->w_free_function_number_of_knots ; i++){
+        pba->w_free_function_redshift_at_knot[i] = log10(pba->w_free_function_redshift_at_knot[i]);
+      }
+      // printf("a %e z %e pba->w_free_function_redshift_at_knot[pba->w_free_function_number_of_knots-1] %e %d \n", a,z,pba->w_free_function_redshift_at_knot[pba->w_free_function_number_of_knots-1],pba->w_free_function_table_is_log);
+      pba->w_free_function_table_is_log = _TRUE_;
+    }
+
+  else if(z<=pba->w_free_function_logz_interpolation_above_z && pba->w_free_function_table_is_log == _TRUE_ && pba->w_free_function_redshift_at_knot[pba->w_free_function_number_of_knots-1]  < 20){
+    for(i = 0 ; i < pba->w_free_function_number_of_knots ; i++){
+      pba->w_free_function_redshift_at_knot[i] = pow(10,pba->w_free_function_redshift_at_knot[i]);
+    }
+    // printf("a %e  z %e pba->w_free_function_redshift_at_knot[pba->w_free_function_number_of_knots-1] %e %d \n", a,z,pba->w_free_function_redshift_at_knot[pba->w_free_function_number_of_knots-1],pba->w_free_function_table_is_log);
+    pba->w_free_function_table_is_log = _FALSE_;
+  }
+
+  if(z > pba->w_free_function_logz_interpolation_above_z && pba->w_free_function_table_is_log == _TRUE_){
+    z=log10(z);
+  }
+
+
+
+   if(pba->w_free_function_interpolation_is_linear == _TRUE_){
+     class_call(array_interpolate_linear(pba->w_free_function_redshift_at_knot,
+                                      pba->w_free_function_number_of_knots,
+                                      pba->w_free_function_at_knot,
+                                      pba->w_free_function_number_of_columns,
+                                      z,
+                                      &last_index,
+                                      result,
+                                      pba->w_free_function_number_of_columns,
+                                      pba->error_message),
+             pba->error_message,
+             pba->error_message);
+    }
+    else{
+      class_call(array_interpolate_spline(pba->w_free_function_redshift_at_knot,
+                                          pba->w_free_function_number_of_knots,
+                                          pba->w_free_function_at_knot,
+                                          pba->w_free_function_dd_at_knot,
+                                          pba->w_free_function_number_of_columns,
+                                          z,
+                                          &last_index,
+                                          result,
+                                          pba->w_free_function_number_of_columns,
+                                          pba->error_message),
+                 pba->error_message,
+                 pba->error_message);
+    }
+
+
+  *w_fld = result[0];
+  *dw_fld = result[1];
+  // *intw_fld = 0;
+  // printf("a %e z %e w_fld %e dw_fld %e ddwfld %e  dddwfld %e \n",a,z,*w_fld,*dw_fld,result[2],result[3]);
+  return _SUCCESS_;
+}
+
+
 
 /**
  * Initialize the background structure, and in particular the
@@ -621,8 +1114,10 @@ int background_init(
 
   /* fluid equation of state */
   if (pba->has_fld == _TRUE_) {
-
-    class_call(background_w_fld(pba,0.,&w_fld,&dw_over_da,&integral_fld), pba->error_message, pba->error_message);
+    if(pba->w_fld_parametrization == w_free_function){
+      w_free_function_init(ppr,pba);
+    }
+    class_call(background_w_fld(pba,0,&w_fld,&dw_over_da,&integral_fld,0), pba->error_message, pba->error_message);
 
     class_test(w_fld >= 1./3.,
                pba->error_message,
@@ -679,7 +1174,12 @@ int background_free(
   free(pba->d2tau_dz2_table);
   free(pba->background_table);
   free(pba->d2background_dtau2_table);
-
+  // if(pba->w_fld_parametrization == w_free_function){
+  //   free(pba->w_free_function_at_knot);
+  //   free(pba->w_free_function_value_at_knot);
+  //   free(pba->w_free_function_redshift_at_knot);
+  //   if(pba->w_free_function_interpolation_is_linear == _FALSE_)free(pba->w_free_function_dd_at_knot);
+  // }
   err = background_free_input(pba);
 
   return err;
@@ -735,6 +1235,7 @@ int background_free_input(
     if (pba->scf_parameters != NULL)
       free(pba->scf_parameters);
   }
+
   return _SUCCESS_;
 }
 
@@ -761,6 +1262,8 @@ int background_indices(
   /** - initialize all flags: which species are present? */
 
   pba->has_cdm = _FALSE_;
+  /* TK added GDM here */
+  pba->has_gdm = _FALSE_;
   pba->has_ncdm = _FALSE_;
   pba->has_dcdm = _FALSE_;
   pba->has_dr = _FALSE_;
@@ -770,8 +1273,13 @@ int background_indices(
   pba->has_ur = _FALSE_;
   pba->has_curvature = _FALSE_;
 
-  if (pba->Omega0_cdm != 0.)
+  if (pba->Omega0_cdm != 0.){
     pba->has_cdm = _TRUE_;
+  }
+
+  /* TK added GDM here */
+  if (pba->Omega0_gdm != 0.)
+    pba->has_gdm = _TRUE_;
 
   if (pba->Omega0_ncdm_tot != 0.)
     pba->has_ncdm = _TRUE_;
@@ -789,14 +1297,16 @@ int background_indices(
   if (pba->Omega0_lambda != 0.)
     pba->has_lambda = _TRUE_;
 
-  if (pba->Omega0_fld != 0.)
+  if (pba->n_fld != 0){
     pba->has_fld = _TRUE_;
+  }
 
   if (pba->Omega0_ur != 0.)
     pba->has_ur = _TRUE_;
 
   if (pba->sgnK != 0)
     pba->has_curvature = _TRUE_;
+
 
   /** - initialize all indices */
 
@@ -821,6 +1331,11 @@ int background_indices(
   /* - index for rho_cdm */
   class_define_index(pba->index_bg_rho_cdm,pba->has_cdm,index_bg,1);
 
+  /* TK added this to initialise index for rho_gdm */
+  /* - index for rho_gdm */
+  class_define_index(pba->index_bg_rho_gdm,_TRUE_,index_bg,1);
+
+
   /* - indices for ncdm. We only define the indices for ncdm1
      (density, pressure, pseudo-pressure), the other ncdm indices
      are contiguous */
@@ -843,13 +1358,16 @@ int background_indices(
   class_define_index(pba->index_bg_rho_scf,pba->has_scf,index_bg,1);
   class_define_index(pba->index_bg_p_scf,pba->has_scf,index_bg,1);
   class_define_index(pba->index_bg_w_scf,pba->has_scf,index_bg,1);
+  class_define_index(pba->index_bg_dw_scf,pba->has_scf,index_bg,1);
+  class_define_index(pba->index_bg_ddw_scf,pba->has_scf,index_bg,1);
 
   /* - index for Lambda */
   class_define_index(pba->index_bg_rho_lambda,pba->has_lambda,index_bg,1);
 
   /* - index for fluid */
-  class_define_index(pba->index_bg_rho_fld,pba->has_fld,index_bg,1);
-  class_define_index(pba->index_bg_w_fld,pba->has_fld,index_bg,1);
+  class_define_index(pba->index_bg_rho_fld,pba->has_fld,index_bg,pba->n_fld);
+  class_define_index(pba->index_bg_w_fld,pba->has_fld,index_bg,pba->n_fld);
+  class_define_index(pba->index_bg_dw_fld,pba->has_fld,index_bg,pba->n_fld);
 
   /* - index for ultra-relativistic neutrinos/species */
   class_define_index(pba->index_bg_rho_ur,pba->has_ur,index_bg,1);
@@ -916,7 +1434,7 @@ int background_indices(
   class_define_index(pba->index_bi_rho_dr,pba->has_dr,index_bi,1);
 
   /* -> energy density in fluid */
-  class_define_index(pba->index_bi_rho_fld,pba->has_fld,index_bi,1);
+  class_define_index(pba->index_bi_rho_fld,pba->has_fld,index_bi,pba->n_fld);
 
   /* -> scalar field and its derivative wrt conformal time (Zuma) */
   class_define_index(pba->index_bi_phi_scf,pba->has_scf,index_bi,1);
@@ -1746,6 +2264,35 @@ int background_solve(
              pba->error_message,
              pba->error_message);
 
+  /** - if needed, compute dw_over_dtau_scf */
+  if(pba->has_scf == _TRUE_ && pba->scf_perturbs_like_fluid==_TRUE_){
+
+    /** - ---> second derivative with respect to tau of cb2 */
+    class_call(array_spline_table_line_to_line(pba->tau_table,
+                                              pba->bt_size,
+                                              pba->background_table,
+                                              pba->bg_size,
+                                              pba->index_bg_w_scf,
+                                              pba->index_bg_ddw_scf,
+                                              _SPLINE_EST_DERIV_,
+                                              pba->error_message),
+               pba->error_message,
+               pba->error_message);
+
+    class_call(array_derive_spline_table_line_to_line(pba->tau_table,
+                                                      pba->bt_size,
+                                                      pba->background_table,
+                                                      pba->bg_size,
+                                                      pba->index_bg_w_scf,
+                                                      pba->index_bg_ddw_scf,
+                                                      pba->index_bg_dw_scf,
+                                                      pba->error_message),
+               pba->error_message,
+               pba->error_message);
+
+
+  }
+
   /** - compute remaining "related parameters"
    *     - so-called "effective neutrino number", computed at earliest
       time in interpolation table. This should be seen as a
@@ -1825,10 +2372,10 @@ int background_initial_conditions(
   double scf_lambda;
   double rho_fld_today;
   double w_fld,dw_over_da_fld,integral_fld;
-
+  int n;
   /** - fix initial value of \f$ a \f$ */
   a = ppr->a_ini_over_a_today_default * pba->a_today;
-
+  // printf("a %e \n",a);
   /**  If we have ncdm species, perhaps we need to start earlier
       than the standard value for the species to be relativistic.
       This could happen for some WDM models.
@@ -1876,6 +2423,12 @@ int background_initial_conditions(
   Omega_rad = pba->Omega0_g;
   if (pba->has_ur == _TRUE_)
     Omega_rad += pba->Omega0_ur;
+
+  // TK added GDM here
+  // Not sure if GDM should be added here
+  if (pba->has_gdm == _TRUE_ && (pba->w_gdm > 0.33 && pba->w_gdm < 0.34))
+    Omega_rad += pba->Omega0_gdm;
+
   rho_rad = Omega_rad*pow(pba->H0,2)/pow(a/pba->a_today,4);
   if (pba->has_ncdm == _TRUE_){
     /** - We must add the relativistic contribution from NCDM species */
@@ -1909,22 +2462,46 @@ int background_initial_conditions(
   }
 
   if (pba->has_fld == _TRUE_){
+    for(n = 0 ; n<pba->n_fld ; n++){
+      /* rho_fld today */
+      if(pba->Omega0_fld!=0) rho_fld_today = pba->Omega0_fld * pow(pba->H0,2);
+      else rho_fld_today = pba->Omega_many_fld[n] * pow(pba->H0,2);
+      /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0) */
+      class_call(background_w_fld(pba,a,&w_fld,&dw_over_da_fld,&integral_fld,n), pba->error_message, pba->error_message);
 
-    /* rho_fld today */
-    rho_fld_today = pba->Omega0_fld * pow(pba->H0,2);
-
-    /* integrate rho_fld(a) from a_ini to a_0, to get rho_fld(a_ini) given rho_fld(a0) */
-    class_call(background_w_fld(pba,a,&w_fld,&dw_over_da_fld,&integral_fld), pba->error_message, pba->error_message);
-
-    /* Note: for complicated w_fld(a) functions with no simple
-    analytic integral, this is the place were you should compute
-    numerically the simple 1d integral [int_{a_ini}^{a_0} 3
-    [(1+w_fld)/a] da] (e.g. with the Romberg method?) instead of
-    calling background_w_fld */
-
-    /* rho_fld at initial time */
-    pvecback_integration[pba->index_bi_rho_fld] = rho_fld_today * exp(integral_fld);
-
+      /* Note: for complicated w_fld(a) functions with no simple
+      analytic integral, this is the place were you should compute
+      numerically the simple 1d integral [int_{a_ini}^{a_0} 3
+      [(1+w_fld)/a] da] (e.g. with the Romberg method?) instead of
+      calling background_w_fld */
+      int is_log = _TRUE_;
+      double tmp_integral = 0;
+      if(pba->w_fld_parametrization == w_free_function) {
+        if(pba->w_free_function_from_file == _TRUE_){
+          is_log = _FALSE_;
+        class_call(romberg_integrate_w_free_function(pba,a,pba->a_today,20,1e-4,&tmp_integral,is_log,n),pba->error_message, pba->error_message);
+        integral_fld=tmp_integral;
+        // integral_fld = 6.6671e-7;
+        }
+        else{
+          class_call(romberg_integrate_w_free_function(pba,log10(a),0,30,1e-4,&tmp_integral,is_log,n),pba->error_message, pba->error_message);
+          // if(pba->w_fld_parametrization == w_free_function) class_call(simpson_integrate_w_free_function(pba,-14,-3,1e6,&integral_fld),pba->error_message, pba->error_message);
+          integral_fld=log(10)*tmp_integral; //log10 to log natural conversion
+        }
+        // is_log = _FALSE_;
+        // class_call(romberg_integrate_w_free_function(pba,1e-3,pba->a_today,30,1e-3,&tmp_integral,is_log),pba->error_message, pba->error_message);
+        // integral_fld+=tmp_integral;
+      }
+      else if (pba->w_fld_parametrization == pheno_alternative){
+        is_log = _FALSE_;
+      class_call(romberg_integrate_w_free_function(pba,a,pba->a_today,30,1e-4,&tmp_integral,is_log,n),pba->error_message, pba->error_message);
+      integral_fld=tmp_integral;
+      }
+      // printf("a ini %e a today %e integral_fld  %e\n", a,pba->a_today, integral_fld);
+      // integral_fld = 1; // currently assume the fluid to be negligeable at early time.
+      /* rho_fld at initial time */
+      pvecback_integration[pba->index_bi_rho_fld+n] = rho_fld_today * exp(integral_fld);
+    }
   }
 
   /** - Fix initial value of \f$ \phi, \phi' \f$
@@ -2014,7 +2591,7 @@ int background_output_titles(struct background * pba,
       to be indented correctly, but it can be as long as . */
   int n;
   char tmp[20];
-
+  // printf("has_fld  %d %d \n", pba->has_fld,pba->has_cdm);
   class_store_columntitle(titles,"z",_TRUE_);
   class_store_columntitle(titles,"proper time [Gyr]",_TRUE_);
   class_store_columntitle(titles,"conf. time [Mpc]",_TRUE_);
@@ -2026,6 +2603,7 @@ int background_output_titles(struct background * pba,
   class_store_columntitle(titles,"(.)rho_g",_TRUE_);
   class_store_columntitle(titles,"(.)rho_b",_TRUE_);
   class_store_columntitle(titles,"(.)rho_cdm",pba->has_cdm);
+  class_store_columntitle(titles,"(.)rho_gdm",pba->has_gdm);
   if (pba->has_ncdm == _TRUE_){
     for (n=0; n<pba->N_ncdm; n++){
       sprintf(tmp,"(.)rho_ncdm[%d]",n);
@@ -2035,8 +2613,16 @@ int background_output_titles(struct background * pba,
     }
   }
   class_store_columntitle(titles,"(.)rho_lambda",pba->has_lambda);
-  class_store_columntitle(titles,"(.)rho_fld",pba->has_fld);
-  class_store_columntitle(titles,"(.)w_fld",pba->has_fld);
+  if (pba->has_fld == _TRUE_ && pba->scf_perturbs_like_fluid == _FALSE_){
+    for (n=0; n<pba->n_fld; n++){
+      sprintf(tmp,"(.)rho_fld[%d]",n);
+      class_store_columntitle(titles,tmp,_TRUE_);
+      sprintf(tmp,"(.)w_fld[%d]",n);
+      class_store_columntitle(titles,tmp,_TRUE_);
+      sprintf(tmp,"(.)dw_fld[%d]",n);
+      class_store_columntitle(titles,tmp,_TRUE_);
+    }
+  }
   class_store_columntitle(titles,"(.)rho_ur",pba->has_ur);
   class_store_columntitle(titles,"(.)rho_crit",_TRUE_);
   class_store_columntitle(titles,"(.)rho_dcdm",pba->has_dcdm);
@@ -2045,6 +2631,7 @@ int background_output_titles(struct background * pba,
   class_store_columntitle(titles,"(.)rho_scf",pba->has_scf);
   class_store_columntitle(titles,"(.)p_scf",pba->has_scf);
   class_store_columntitle(titles,"(.)w_scf",pba->has_scf);
+  if(pba->scf_perturbs_like_fluid==_TRUE_)class_store_columntitle(titles,"(.)dw_scf",pba->has_scf);
   class_store_columntitle(titles,"phi_scf",pba->has_scf);
   class_store_columntitle(titles,"phi'_scf",pba->has_scf);
   class_store_columntitle(titles,"V_scf",pba->has_scf);
@@ -2081,6 +2668,11 @@ int background_output_data(
     class_store_double(dataptr,pvecback[pba->index_bg_rho_g],_TRUE_,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_rho_b],_TRUE_,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_rho_cdm],pba->has_cdm,storeidx);
+    /* TK added this to store rho_GDM index */
+    class_store_double(dataptr,pvecback[pba->index_bg_rho_gdm],pba->has_gdm,storeidx);
+    // TK , VP to debug background
+    // printf(" a %e rhi_cdm %e\n", pba->a_today/pvecback[pba->index_bg_a]-1.,pvecback[pba->index_bg_rho_cdm]);
+    // printf(" a %e rhi_gdm %e\n", pba->a_today/pvecback[pba->index_bg_a]-1.,pvecback[pba->index_bg_rho_gdm]);
     if (pba->has_ncdm == _TRUE_){
       for (n=0; n<pba->N_ncdm; n++){
         class_store_double(dataptr,pvecback[pba->index_bg_rho_ncdm1+n],_TRUE_,storeidx);
@@ -2088,8 +2680,14 @@ int background_output_data(
       }
     }
     class_store_double(dataptr,pvecback[pba->index_bg_rho_lambda],pba->has_lambda,storeidx);
-    class_store_double(dataptr,pvecback[pba->index_bg_rho_fld],pba->has_fld,storeidx);
-    class_store_double(dataptr,pvecback[pba->index_bg_w_fld],pba->has_fld,storeidx);
+    if(pba->has_fld == _TRUE_ && pba->scf_perturbs_like_fluid == _FALSE_){
+      for (n=0; n<pba->n_fld; n++){
+        class_store_double(dataptr,pvecback[pba->index_bg_rho_fld+n],pba->has_fld,storeidx);
+        class_store_double(dataptr,pvecback[pba->index_bg_w_fld+n],pba->has_fld,storeidx);
+        class_store_double(dataptr,pvecback[pba->index_bg_dw_fld+n],pba->has_fld,storeidx);
+      }
+    }
+
     class_store_double(dataptr,pvecback[pba->index_bg_rho_ur],pba->has_ur,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_rho_crit],_TRUE_,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_rho_dcdm],pba->has_dcdm,storeidx);
@@ -2098,6 +2696,7 @@ int background_output_data(
     class_store_double(dataptr,pvecback[pba->index_bg_rho_scf],pba->has_scf,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_p_scf],pba->has_scf,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_w_scf],pba->has_scf,storeidx);
+    if(pba->scf_perturbs_like_fluid==_TRUE_)class_store_double(dataptr,pvecback[pba->index_bg_dw_scf],pba->has_scf,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_phi_scf],pba->has_scf,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_phi_prime_scf],pba->has_scf,storeidx);
     class_store_double(dataptr,pvecback[pba->index_bg_V_scf],pba->has_scf,storeidx);
@@ -2153,7 +2752,7 @@ int background_derivs(
   struct background_parameters_and_workspace * pbpaw;
   struct background * pba;
   double * pvecback, a, H, rho_M;
-
+  int n;
   pbpaw = parameters_and_workspace;
   pba =  pbpaw->pba;
   pvecback = pbpaw->pvecback;
@@ -2184,6 +2783,13 @@ int background_derivs(
   rho_M = pvecback[pba->index_bg_rho_b];
   if (pba->has_cdm)
     rho_M += pvecback[pba->index_bg_rho_cdm];
+
+  // TK added GDM here
+  // Not sure about this one
+  if (pba->has_gdm && pba->w_gdm < 0.33)
+    rho_M += pvecback[pba->index_bg_rho_gdm];
+
+
   dy[pba->index_bi_D] = y[pba->index_bi_D_prime];
   dy[pba->index_bi_D_prime] = -a*H*y[pba->index_bi_D_prime] + 1.5*a*a*rho_M*y[pba->index_bi_D];
 
@@ -2201,7 +2807,9 @@ int background_derivs(
 
   if (pba->has_fld == _TRUE_) {
     /** - Compute fld density \f$ \rho' = -3aH (1+w_{fld}(a)) \rho \f$ */
-    dy[pba->index_bi_rho_fld] = -3.*y[pba->index_bi_a]*pvecback[pba->index_bg_H]*(1.+pvecback[pba->index_bg_w_fld])*y[pba->index_bi_rho_fld];
+    for(n = 0; n < pba->n_fld; n++){
+      dy[pba->index_bi_rho_fld+n] = -3.*y[pba->index_bi_a]*pvecback[pba->index_bg_H]*(1.+pvecback[pba->index_bg_w_fld+n])*y[pba->index_bi_rho_fld+n];
+    }
   }
 
   if (pba->has_scf == _TRUE_){

@@ -1,5 +1,5 @@
 /** @file thermodynamics.c Documented thermodynamics module
- *
+ * test
  * Julien Lesgourgues, 6.09.2010
  *
  * Deals with the thermodynamical evolution.
@@ -260,7 +260,7 @@ int thermodynamics_at_z(
     // 	pvecthermo[pth->index_th_exp_m_mu_gcdm] = 1;
     // }
     /* if necessary, computes equivalent functions from bayon-DE scattering */
-    // 
+    //
     // if(pth->u_bscf != 0){
     //
     //   /* Calculate dmu/dtau (dmu/dtau = a n_cdm sigma_gcdm = a^{-2} n_cdm(today) sigma_gcdm in units of 1/Mpc, where sigma_cdm = u_gcdm sigma_T 10^-11 GeV m_cdm. Also need to use Omega0_cdm = rho0_cdm / rho0_crit) */

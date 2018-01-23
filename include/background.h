@@ -11,7 +11,7 @@
 #include "parser.h"
 
 enum spatial_curvature {flat,open,closed};
-
+enum w_fld_parametrization {CPL,pheno_axion,w_free_function,pheno_alternative,w_scf_like_fluid};
 /**
  * All background parameters and evolution that other modules need to know.
  *
@@ -53,13 +53,21 @@ struct background
   double Omega0_lambda; /**< \f$ \Omega_{0_\Lambda} \f$: cosmological constant */
 
   double Omega0_fld; /**< \f$ \Omega_{0 de} \f$: fluid */
+  double * Omega_many_fld; /**< \f$ \Omega_{0 de} \f$: if many fluids */
   double w0_fld; /**< \f$ w0_{DE} \f$: current fluid equation of state parameter */
   double wa_fld; /**< \f$ wa_{DE} \f$: fluid equation of state parameter derivative */
+  short  fld_has_perturbations;
 
   double cs2_fld; /**< \f$ c^2_{s~DE} \f$: sound speed of the fluid
 		     in the frame comoving with the fluid (so, this is
 		     not [delta p/delta rho] in the synchronous or
 		     newtonian gauge!!!) */
+
+   /** - TK added GDM parameters here */
+   double w_gdm; /*** eq of state parameter of the GDM */
+   double ceff2_gdm; /*** effective sound speed of the GDM */
+   double cvis2_gdm; /*** viscosity parameter of the GDM */
+   double Omega0_gdm; /*** fractional energy density today of the GDM */
 
   short use_ppf; /**< flag switching on PPF perturbation equations
                     instead of true fluid equations for
@@ -92,6 +100,23 @@ struct background
   //double scf_A; /**< \f$ \alpha \f$ : Albrecht-Skordis offset */
 
   double Omega0_k; /**< \f$ \Omega_{0_k} \f$: curvature contribution */
+
+
+  /** modification by VP to add an arbitrary species whose energy density is specified by the user at several knot */
+  double rho_w_free_function;
+  double * w_free_function_at_knot;
+  double * w_free_function_value_at_knot;
+  double * w_free_function_d_at_knot;
+  double * w_free_function_dd_at_knot;
+  double * w_free_function_ddd_at_knot;
+  short w_free_function_table_is_log;
+  short w_free_function_from_file;
+  double w_free_function_logz_interpolation_above_z;
+  short w_free_function_interpolation_is_linear;
+  // double * w_free_function_dd_density_at_knot;
+  double * w_free_function_redshift_at_knot;
+  int w_free_function_number_of_knots;
+  int w_free_function_number_of_columns;
 
   int N_ncdm;                            /**< Number of distinguishable ncdm species */
   double * M_ncdm;                       /**< vector of masses of non-cold relic:
@@ -169,9 +194,14 @@ struct background
   int index_bg_rho_lambda;    /**< cosmological constant density */
   int index_bg_rho_fld;       /**< fluid density */
   int index_bg_w_fld;         /**< fluid equation of state */
+  int index_bg_dw_fld;         /**< derivative of fluid equation of state */
   int index_bg_rho_ur;        /**< relativistic neutrinos/relics density */
   int index_bg_rho_dcdm;      /**< dcdm density */
   int index_bg_rho_dr;        /**< dr density */
+
+  /* TK added stuff for keeping track of GDM */
+  int index_bg_rho_gdm;       /**< GDM density */
+
 
   int index_bg_phi_scf;       /**< scalar field value */
   int index_bg_phi_prime_scf; /**< scalar field derivative wrt conformal time */
@@ -181,12 +211,18 @@ struct background
   int index_bg_rho_scf;       /**< scalar field energy density */
   int index_bg_p_scf;         /**< scalar field pressure */
   int index_bg_w_scf;         /**< scalar field e.o.s. */
+  int index_bg_dw_scf;         /**< scalar field derivative of e.o.s. w/r to tau */
+  int index_bg_ddw_scf;         /**< scalar field double derivative of e.o.s. w/r to tau*/
+  short scf_perturbs_like_fluid; /**< to treat scf like a fluid in the perturbation module */
 
   int index_bg_rho_ncdm1;     /**< density of first ncdm species (others contiguous) */
   int index_bg_p_ncdm1;       /**< pressure of first ncdm species (others contiguous) */
   int index_bg_pseudo_p_ncdm1;/**< another statistical momentum useful in ncdma approximation */
 
   int index_bg_Omega_r;       /**< relativistic density fraction (\f$ \Omega_{\gamma} + \Omega_{\nu r} \f$) */
+  /** modification by VP to add an arbitrary species whose energy density is specified by the user at several knot */
+  int index_bg_rho_w_free_function;
+  int index_bg_p_w_free_function;
 
   /* end of vector in normal format, now quantities in long format */
 
@@ -270,6 +306,10 @@ struct background
   //@{
 
   short has_cdm;       /**< presence of cold dark matter? */
+
+  /* TK added stuff for checking for GDM */
+  short has_gdm;       /**< presence of generalised dark matter? */
+
   short has_dcdm;      /**< presence of decaying cold dark matter? */
   short has_dr;        /**< presence of relativistic decay radiation? */
   short has_scf;       /**< presence of a scalar field? */
@@ -278,6 +318,7 @@ struct background
   short has_fld;       /**< presence of fluid with constant w and cs2? */
   short has_ur;        /**< presence of ultra-relativistic neutrinos/relics? */
   short has_curvature; /**< presence of global spatial curvature? */
+  short has_w_free_function; /**< presence of an arbitrary species with user specified density at some knots? */
 
   //@}
 
@@ -299,6 +340,17 @@ struct background
   int * q_size_ncdm;    /**< Size of the q_ncdm arrays */
   double * factor_ncdm; /**< List of normalization factors for calculating energy density etc.*/
 
+  //@}
+
+  /**
+   *@name - some flags needed for calling background functions
+   */
+
+  //@{
+  enum w_fld_parametrization w_fld_parametrization;
+  int n_fld;
+  double * a_c;
+  double * n_pheno_axion;
   //@}
 
   /**
@@ -404,7 +456,8 @@ extern "C" {
                        double a,
                        double * w_fld,
                        double * dw_over_da_fld,
-                       double * integral_fld);
+                       double * integral_fld,
+                       int n_fld);
 
   int background_init(
 		      struct precision *ppr,
@@ -512,7 +565,40 @@ extern "C" {
                double phi,
                double phi_prime
                );
-
+ int interpolate_w_free_function_at_a(
+                          struct background * pba,
+                          double a,
+                          double *w_fld,
+                          double *dw_fld
+                        );
+ int w_free_function_init(
+                          struct precision *ppr,
+                          struct background *pba
+                        );
+ int simpson_integrate_w_free_function(struct background * pba,
+                                         double /*lower limit*/ a,
+                                         double /*upper limit*/ b,
+                                         size_t max_steps,
+                                         // double /*desired accuracy*/ acc,
+                                         double *intw_fld);
+ int romberg_integrate_w_free_function(struct background * pba,
+                                         double /*lower limit*/ a,
+                                         double /*upper limit*/ b,
+                                         size_t max_steps,
+                                         double /*desired accuracy*/ acc,
+                                         double *intw_fld,
+                                         int is_log,
+                                         int n_fld);
+  int interpolate_w_free_function_from_file_at_a(
+                                                  struct background * pba,
+                                                  double a,
+                                                  double *w_fld,
+                                                  double *dw_fld
+                                                );
+ double integrand_fld_free_function(struct background * pba,
+                                    double a,
+                                    int is_log,
+                                    int n_fld);
 #ifdef __cplusplus
 }
 #endif

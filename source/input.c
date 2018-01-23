@@ -766,6 +766,7 @@ int input_read_parameters(
 
     if (flag1 == _TRUE_) {
       pba->Omega0_ur = param1*7./8.*pow(4./11.,4./3.)*pba->Omega0_g;
+
     }
     if (flag2 == _TRUE_) {
       pba->Omega0_ur = param2;
@@ -803,6 +804,59 @@ int input_read_parameters(
     pba->Omega0_cdm = param2/pba->h/pba->h;
 
   Omega_tot += pba->Omega0_cdm;
+    /** - TK added GDM here */
+
+    // For the GDM eq of state w_gdm
+    class_call(parser_read_double(pfc,"w_gdm",&param1,&flag1,errmsg),
+               errmsg,
+               errmsg);
+    if (flag1 == _TRUE_)
+      pba->w_gdm = param1;
+
+    // For the GDM effective sound speed ceff2_gdm
+    class_call(parser_read_double(pfc,"ceff2_gdm",&param1,&flag1,errmsg),
+               errmsg,
+               errmsg);
+    if (flag1 == _TRUE_)
+      ppt->ceff2_gdm = param1;
+
+    // For the GDM viscosity parameter cvis2_gdm
+    class_call(parser_read_double(pfc,"cvis2_gdm",&param1,&flag1,errmsg),
+               errmsg,
+               errmsg);
+    if (flag1 == _TRUE_)
+      ppt->cvis2_gdm = param1;
+
+    // For the GDM fractional energy density today Omega0_gdm
+    class_call(parser_read_double(pfc,"Omega_gdm",&param1,&flag1,errmsg),
+               errmsg,
+               errmsg);
+    class_call(parser_read_double(pfc,"omega_gdm",&param2,&flag2,errmsg),
+               errmsg,
+               errmsg);
+    class_test(((flag1 == _TRUE_) && (flag2 == _TRUE_)),
+               errmsg,
+               "In input file, you can only enter one of Omega_gdm or omega_gdm, choose one");
+    if (pba->w_gdm > 0.33 && pba->w_gdm < 0.34){
+      if(flag1 == _TRUE_) pba->Omega0_gdm = param1*7./8.*pow(4./11.,4./3.)*pba->Omega0_g;
+      else if(flag2 == _TRUE_) pba->Omega0_gdm = param2*7./8.*pow(4./11.,4./3.)*pba->Omega0_g;
+      // printf("pba->Omega0_gdm %e\n", pba->Omega0_gdm);
+    }
+    else {
+      if ( flag1 == _TRUE_)
+        pba->Omega0_gdm = param1;
+      if (flag2 == _TRUE_)
+        pba->Omega0_gdm = param2/pba->h/pba->h;
+    }
+
+    Omega_tot += pba->Omega0_gdm;
+
+
+    // printf("This is what was read in for GDM parameters \nw_gdm = %f    ceff^2_gdm = %f    cvis^2_gdm = %f   Omega_gdm = %f\n", pba->w_gdm, ppt->ceff2_gdm, ppt->cvis2_gdm, pba->Omega0_gdm);
+
+
+
+
 
   /** - Omega_0_dcdmdr (DCDM) */
   class_call(parser_read_double(pfc,"Omega_dcdmdr",&param1,&flag1,errmsg),
@@ -862,8 +916,7 @@ int input_read_parameters(
   // fprintf(stdout, "you have chosen Gamma = %e*H0, tau = %e s \n",pba->Gamma_dcdm/(1.e3 / _c_)/67,param2);
   }
 
-  /** Input parameters relative to DE-baryon scattering */
-  class_read_double("u_bscf",pth->u_bscf); /** interaction rate */
+
   /** Input parameters relative to DM-baryon scattering */
   class_read_double("u_gcdm",pth->u_gcdm); /** interaction rate */
 
@@ -1040,6 +1093,417 @@ int input_read_parameters(
   if (pba->K > 0.) pba->sgnK = 1;
   else if (pba->K < 0.) pba->sgnK = -1;
 
+
+   class_call(parser_read_string(pfc,"w_fld_parametrization",&string1,&flag1,errmsg),
+              errmsg,
+              errmsg);
+
+
+     if (flag1 == _TRUE_) {
+       if((strstr(string1,"w_free_function") != NULL)) {
+         pba->n_fld = 1;
+         pba->w_fld_parametrization = w_free_function;
+         class_call(parser_read_double(pfc,"Omega_fld",&param2,&flag2,errmsg),
+                    errmsg,
+                    errmsg);
+         if(flag2==_FALSE_){
+           class_call(parser_read_double(pfc,"fraction_axion",&param2,&flag2,errmsg),
+                      errmsg,
+                      errmsg);
+            pba->Omega0_fld = param2/(1-param2)*pba->Omega0_cdm;
+            Omega_tot += pba->Omega0_fld; //will be added later if Omega_fld is defined
+            class_test(flag2==_FALSE_,"you either forgot to give Omega_fld or passed Omega_many_fld with w_fld_parametrization = w_free_function. This option is not yet available. Please enter Omega_fld or fraction_axion.",errmsg);
+          }
+
+
+            class_call(parser_read_string(pfc,
+                                          "w_free_function_from_file",
+                                          &(string2),
+                                          &(flag2),
+                                          errmsg),
+                       errmsg,
+                       errmsg);
+
+            if (flag2 == _TRUE_) {
+              if ((strstr(string2,"y") != NULL) || (strstr(string2,"Y") != NULL)) {
+                pba->w_free_function_from_file = _TRUE_;
+                class_read_string("w_free_function_file",ppr->w_free_function_file);
+              }
+              else {
+                if ((strstr(string2,"n") != NULL) || (strstr(string2,"N") != NULL)) {
+                  pba->w_free_function_from_file = _FALSE_;
+                }
+                else {
+                  class_stop(errmsg,"incomprehensible input '%s' for the field 'w_free_function_from_file'",string2);
+                }
+              }
+            }
+
+            class_read_double("w_free_function_number_of_knots",pba->w_free_function_number_of_knots);
+            double *tmp_w_free_function;
+            if(pba->w_free_function_number_of_knots > 0){
+
+
+                  class_call(parser_read_string(pfc,
+                                                "w_free_function_interpolation_is_linear",
+                                                &(string2),
+                                                &(flag2),
+                                                errmsg),
+                             errmsg,
+                             errmsg);
+
+                  if (flag2 == _TRUE_) {
+                    if ((strstr(string2,"y") != NULL) || (strstr(string2,"Y") != NULL)) {
+                      pba->w_free_function_interpolation_is_linear = _TRUE_;
+                    }
+                    else {
+                      if ((strstr(string2,"n") != NULL) || (strstr(string2,"N") != NULL)) {
+                        pba->w_free_function_interpolation_is_linear = _FALSE_;
+                      }
+                      else {
+                        class_stop(errmsg,"incomprehensible input '%s' for the field 'w_free_function_interpolation_is_linear'",string2);
+                      }
+                    }
+                  }
+
+                  class_read_double("w_free_function_logz_interpolation_above_z",pba->w_free_function_logz_interpolation_above_z);
+                  pba->w_free_function_table_is_log = _FALSE_;
+                  class_read_list_of_doubles_or_default("w_free_function_redshift_at_knot",pba->w_free_function_redshift_at_knot,0.0,pba->w_free_function_number_of_knots);
+                  class_read_list_of_doubles_or_default("w_free_function_value_at_knot",pba->w_free_function_value_at_knot,0.0,pba->w_free_function_number_of_knots);
+                  pba->w_free_function_number_of_columns = 4;//[0,1,2,3]=[1,dw,ddw,dddw];
+                  class_alloc(pba->w_free_function_at_knot,sizeof(double)*pba->w_free_function_number_of_columns*pba->w_free_function_number_of_knots,pba->error_message);
+                  for(i=0;i<pba->w_free_function_number_of_knots;i++){
+                    pba->w_free_function_at_knot[i*pba->w_free_function_number_of_columns]=pba->w_free_function_value_at_knot[i];
+                    for(n = 1; n < pba->w_free_function_number_of_columns ; n++)pba->w_free_function_at_knot[i*pba->w_free_function_number_of_columns+n]=0.;
+                    // printf("%e %e %d\n", pba->w_free_function_at_knot[i*pba->w_free_function_number_of_columns],pba->w_free_function_redshift_at_knot[i],pba->w_free_function_number_of_knots);
+                  }
+                  // class_read_list_of_doubles_or_default_fill_column("w_free_function_density_at_knot",pba->w_free_function_at_knot,tmp_w_free_function,0,0.0,pba->w_free_function_number_of_knots,4); //the factor 4 stands for rho,drho,ddrho,dddrho
+                  if(pba->w_free_function_interpolation_is_linear == _FALSE_)class_alloc(pba->w_free_function_dd_at_knot,sizeof(double)*pba->w_free_function_number_of_columns*pba->w_free_function_number_of_knots,pba->error_message);
+
+            }
+       }
+       else if((strstr(string1,"pheno_axion") != NULL)) {
+         pba->w_fld_parametrization = pheno_axion;
+         class_call(parser_read_double(pfc,"Omega_fld",&param2,&flag2,errmsg),
+                    errmsg,
+                    errmsg);
+         if(flag2==_FALSE_){
+                 class_call(parser_read_list_of_doubles(pfc,
+                                                        "Omega_many_fld",
+                                                        &(pba->n_fld),
+                                                        &(pba->Omega_many_fld),
+                                                        &flag2,
+                                                        errmsg),
+                            errmsg,errmsg);
+                class_call(parser_read_list_of_doubles(pfc,
+                                                       "fraction_axion",
+                                                       &(pba->n_fld),
+                                                       &(pba->Omega_many_fld),
+                                                       &flag3,
+                                                       errmsg),
+                           errmsg,errmsg);
+
+                  if(flag2!=_FALSE_ || flag3!=_FALSE_){
+                    class_test(flag2==_TRUE_&&flag3==_TRUE_,"you have passed both 'Omega_many_fld' and 'fraction_axion'. Please pass only one of them.",errmsg,errmsg);
+                    for(n = 0; n < pba->n_fld; n++){
+                      if(flag3==_TRUE_){
+                        pba->Omega_many_fld[n] = pba->Omega0_cdm*pba->Omega_many_fld[n]/(1-pba->Omega_many_fld[n]);
+                      }
+                      Omega_tot += pba->Omega_many_fld[n];
+                      printf("pba->Omega_many_fld[n] %e pba->Omega0_cdm %e\n", pba->Omega_many_fld[n],pba->Omega0_cdm);
+                    }
+                  }
+                  else if(flag2==_FALSE_&&flag3==_FALSE_){
+                    class_stop(errmsg,"you have w_fld_parametrization defined but you forgot to give a value to Omega_fld, Omega_many_fld or fraction_axion. Please adapt you input file.")
+                  }
+                  }
+            else{
+              pba->n_fld = 1;
+            }
+            if(pba->n_fld!=0){
+              class_call(parser_read_list_of_doubles(pfc,
+                                                     "a_c",
+                                                     &int1,
+                                                     &(pba->a_c),
+                                                     &flag2,
+                                                     errmsg),
+                         errmsg,errmsg);
+              class_test(int1!=pba->n_fld,"Careful: the size of the list of 'a_c' isn't equal to that of 'Omega_many_fld'!",errmsg,errmsg);
+              class_call(parser_read_list_of_doubles(pfc,
+                                                     "n_pheno_axion",
+                                                     &int1,
+                                                     &(pba->n_pheno_axion),
+                                                     &flag2,
+                                                     errmsg),
+                         errmsg,errmsg);
+               class_test(int1!=pba->n_fld,"Careful: the size of the list of 'n_pheno_axion' isn't equal to that of 'Omega_many_fld'!",errmsg,errmsg);
+            }
+       }
+       else if((strstr(string1,"pheno_alternative") != NULL)) {
+         pba->w_fld_parametrization = pheno_alternative;
+         class_call(parser_read_double(pfc,"Omega_fld",&param2,&flag2,errmsg),
+                    errmsg,
+                    errmsg);
+         if(flag2==_FALSE_){
+
+
+
+
+           class_call(parser_read_list_of_doubles(pfc,
+                                                  "Omega_many_fld",
+                                                  &(pba->n_fld),
+                                                  &(pba->Omega_many_fld),
+                                                  &flag2,
+                                                  errmsg),
+                      errmsg,errmsg);
+          class_call(parser_read_list_of_doubles(pfc,
+                                                 "fraction_axion",
+                                                 &(pba->n_fld),
+                                                 &(pba->Omega_many_fld),
+                                                 &flag3,
+                                                 errmsg),
+                     errmsg,errmsg);
+            if(flag2!=_FALSE_ || flag3!=_FALSE_){
+              class_test(flag2==_TRUE_&&flag3==_TRUE_,"you have passed both 'Omega_many_fld' and 'fraction_axion'. Please pass only one of them.",errmsg,errmsg);
+              for(n = 0; n < pba->n_fld; n++){
+                if(flag3==_TRUE_){
+                  pba->Omega_many_fld[n] = pba->Omega0_cdm*pba->Omega_many_fld[n]/(1-pba->Omega_many_fld[n]);
+                }
+                Omega_tot += pba->Omega_many_fld[n];
+              }
+            }
+            else if(flag2==_FALSE_&&flag3==_FALSE_){
+              class_stop(errmsg,"you have w_fld_parametrization defined but you forgot to give a value to Omega_fld, Omega_many_fld or fraction_axion. Please adapt you input file.")
+            }
+            }
+            else{
+              pba->n_fld = 1;
+            }
+              if(pba->n_fld!=0){
+                class_call(parser_read_list_of_doubles(pfc,
+                                                       "a_c",
+                                                       &int1,
+                                                       &(pba->a_c),
+                                                       &flag2,
+                                                       errmsg),
+                           errmsg,errmsg);
+                class_test(int1!=pba->n_fld,"Careful: the list of 'a_c' isn't equal to the list of 'Omega_many_fld'!",errmsg,errmsg);
+                class_call(parser_read_list_of_doubles(pfc,
+                                                       "n_pheno_axion",
+                                                       &int1,
+                                                       &(pba->n_pheno_axion),
+                                                       &flag2,
+                                                       errmsg),
+                           errmsg,errmsg);
+                 class_test(int1!=pba->n_fld,"Careful: the list of 'n_pheno_axion' isn't equal to the list of 'Omega_many_fld'!",errmsg,errmsg);
+              }
+
+       }
+       else{
+         pba->w_fld_parametrization = CPL;
+       }
+     }
+     if(pba->w_fld_parametrization == CPL){
+       class_read_double("w0_fld",pba->w0_fld);
+       class_read_double("wa_fld",pba->wa_fld);
+       class_call(parser_read_double(pfc,"Omega_fld",&param2,&flag2,errmsg),
+                  errmsg,
+                  errmsg);
+       if(flag2==_FALSE_){
+         class_call(parser_read_double(pfc,"fraction_axion",&param2,&flag2,errmsg),
+                    errmsg,
+                    errmsg);
+          pba->Omega0_fld = param2*pba->Omega0_cdm;
+          Omega_tot += pba->Omega0_fld;
+          pba->n_fld = 1;
+        }
+     }
+     if(pba->n_fld != 0 ){
+       class_call(parser_read_string(pfc,
+                                     "fld_has_perturbations",
+                                     &(string1),
+                                     &(flag1),
+                                     errmsg),
+                  errmsg,
+                  errmsg);
+
+       if (flag1 == _TRUE_) {
+         if ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)) {
+           pba->fld_has_perturbations = _TRUE_;
+         }
+         else {
+           if ((strstr(string1,"n") != NULL) || (strstr(string1,"N") != NULL)) {
+             pba->fld_has_perturbations = _FALSE_;
+           }
+           else {
+             class_stop(errmsg,"incomprehensible input '%s' for the field 'fld_has_perturbations'",string1);
+           }
+         }
+
+
+
+        class_read_double("cs2_fld",pba->cs2_fld);
+        class_call(parser_read_string(pfc,
+                                      "cs2_is_w",
+                                      &string1,
+                                      &flag1,
+                                      errmsg),
+                    errmsg,
+                    errmsg);
+
+        if (flag1 == _TRUE_){
+          if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+            ppt->cs2_is_w = _TRUE_;
+          }
+          else {
+            ppt->cs2_is_w = _FALSE_;
+          }
+        }
+        class_call(parser_read_string(pfc,
+                                      "use_ppf",
+                                      &string1,
+                                      &flag1,
+                                      errmsg),
+                    errmsg,
+                    errmsg);
+
+        if (flag1 == _TRUE_){
+          if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+            pba->use_ppf = _TRUE_;
+            class_read_double("c_gamma_over_c_fld",pba->c_gamma_over_c_fld);
+          }
+          else {
+            pba->use_ppf = _FALSE_;
+          }
+        }
+        class_call(parser_read_string(pfc,
+                                      "use_big_theta_fld",
+                                      &string1,
+                                      &flag1,
+                                      errmsg),
+                    errmsg,
+                    errmsg);
+
+        if (flag1 == _TRUE_){
+          if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+            ppt->use_big_theta_fld = _TRUE_;
+          }
+          else {
+            ppt->use_big_theta_fld = _FALSE_;
+          }
+        }
+
+      }
+     }
+
+
+
+
+        class_call(parser_read_string(pfc,
+                                      "scf_perturbs_like_fluid",
+                                      &string1,
+                                      &flag1,
+                                      errmsg),
+                    errmsg,
+                    errmsg);
+
+      if(flag1 == _TRUE_){
+      if (((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL))) {
+
+       pba->scf_perturbs_like_fluid = _TRUE_;
+       pba->w_fld_parametrization = w_scf_like_fluid;
+
+
+         class_call(parser_read_string(pfc,
+                                       "fld_has_perturbations",
+                                       &(string1),
+                                       &(flag1),
+                                       errmsg),
+                    errmsg,
+                    errmsg);
+
+         if (flag1 == _TRUE_) {
+           if ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)) {
+             pba->fld_has_perturbations = _TRUE_;
+           }
+           else {
+             if ((strstr(string1,"n") != NULL) || (strstr(string1,"N") != NULL)) {
+               pba->fld_has_perturbations = _FALSE_;
+             }
+             else {
+               class_stop(errmsg,"incomprehensible input '%s' for the field 'fld_has_perturbations'",string1);
+             }
+           }
+
+
+         /** Input parameters relative to DE-baryon scattering */
+         class_read_double("u_bscf",pth->u_bscf); /** interaction rate */
+
+          class_read_double("cs2_fld",pba->cs2_fld);
+          class_call(parser_read_string(pfc,
+                                        "cs2_is_w",
+                                        &string1,
+                                        &flag1,
+                                        errmsg),
+                      errmsg,
+                      errmsg);
+
+          if (flag1 == _TRUE_){
+            if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+              ppt->cs2_is_w = _TRUE_;
+            }
+            else {
+              ppt->cs2_is_w = _FALSE_;
+            }
+          }
+          class_call(parser_read_string(pfc,
+                                        "use_ppf",
+                                        &string1,
+                                        &flag1,
+                                        errmsg),
+                      errmsg,
+                      errmsg);
+
+          if (flag1 == _TRUE_){
+            if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+              pba->use_ppf = _TRUE_;
+              class_read_double("c_gamma_over_c_fld",pba->c_gamma_over_c_fld);
+            }
+            else {
+              pba->use_ppf = _FALSE_;
+            }
+          }
+          class_call(parser_read_string(pfc,
+                                        "use_big_theta_fld",
+                                        &string1,
+                                        &flag1,
+                                        errmsg),
+                      errmsg,
+                      errmsg);
+
+          if (flag1 == _TRUE_){
+            if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
+              ppt->use_big_theta_fld = _TRUE_;
+            }
+            else {
+              ppt->use_big_theta_fld = _FALSE_;
+            }
+          }
+
+        }
+
+
+     }
+     else {
+       pba->scf_perturbs_like_fluid = _FALSE_;
+     }
+    }
+
+
+
+
+
+
   /** - Omega_0_lambda (cosmological constant), Omega0_fld (dark energy fluid), Omega0_scf (scalar field) */
 
   class_call(parser_read_double(pfc,"Omega_Lambda",&param1,&flag1,errmsg),
@@ -1074,6 +1538,7 @@ int input_read_parameters(
   if (flag2 == _TRUE_){
     pba->Omega0_fld = param2;
     Omega_tot += pba->Omega0_fld;
+    if(pba->Omega0_fld!=0)pba->n_fld = 1;
   }
   if ((flag3 == _TRUE_) && (param3 >= 0.)){
     pba->Omega0_scf = param3;
@@ -1111,30 +1576,7 @@ int input_read_parameters(
              errmsg,
              "It looks like you want to fulfil the closure relation sum Omega = 1 using the scalar field, so you have to specify both Omega_lambda and Omega_fld in the .ini file");
 
-  if (pba->Omega0_fld != 0.) {
-    class_read_double("w0_fld",pba->w0_fld);
-    class_read_double("wa_fld",pba->wa_fld);
-    class_read_double("cs2_fld",pba->cs2_fld);
 
-    class_call(parser_read_string(pfc,
-                                  "use_ppf",
-                                  &string1,
-                                  &flag1,
-                                  errmsg),
-                errmsg,
-                errmsg);
-
-    if (flag1 == _TRUE_){
-      if((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)){
-        pba->use_ppf = _TRUE_;
-        class_read_double("c_gamma_over_c_fld",pba->c_gamma_over_c_fld);
-      }
-      else {
-        pba->use_ppf = _FALSE_;
-      }
-    }
-
-  }
 
   /* Additional SCF parameters: */
   if (pba->Omega0_scf != 0.){
@@ -3145,8 +3587,24 @@ if(pth->PBH_low_mass > 0.){
 
   /** - (h.3.) parameters related to the perturbations */
 
-  class_read_int("evolver",ppr->evolver);
+  class_call(parser_read_string(pfc,"evolver",&string1,&flag1,errmsg),
+             errmsg,
+             errmsg);
+  if(flag1==_TRUE_){
+         flag2=_FALSE_;
+         if (strcmp(string1,"rk") == 0) {
+           ppr->evolver=rk;
+           flag2=_TRUE_;
+         }
+         if (strcmp(string1,"ndf15") == 0) {
+           ppr->evolver=ndf15;
+           flag2=_TRUE_;
+         }
 
+         class_test(flag2==_FALSE_,
+                    errmsg,
+                    "could not identify evolver value, check that it is one of 'rk','ndf15'.");
+       }
   class_read_double("k_scalar_min_tau0",ppr->k_min_tau0); // obsolete precision parameter: read for compatibility with old precision files
   class_read_double("k_scalar_max_tau0_over_l_max",ppr->k_max_tau0_over_l_max); // obsolete precision parameter: read for compatibility with old precision files
   class_read_double("k_scalar_step_sub",ppr->k_step_sub); // obsolete precision parameter: read for compatibility with old precision files
@@ -3200,6 +3658,8 @@ if(pth->PBH_low_mass > 0.){
   class_read_int("l_max_pol_g",ppr->l_max_pol_g);
   class_read_int("l_max_dr",ppr->l_max_dr);
   class_read_int("l_max_ur",ppr->l_max_ur);
+  // TK added GDM here
+  class_read_int("l_max_gdm",ppr->l_max_gdm);
   if (pba->N_ncdm>0)
     class_read_int("l_max_ncdm",ppr->l_max_ncdm);
   class_read_int("l_max_g_ten",ppr->l_max_g_ten);
@@ -3485,6 +3945,10 @@ int input_default_params(
   pba->ncdm_psd_parameters = NULL;
   pba->ncdm_psd_files = NULL;
 
+  /* TK added */
+  pba->w_gdm = 0.;
+  pba->Omega0_gdm = 0.;
+
   pba->Omega0_scf = 0.; /* Scalar field defaults */
   pba->attractor_ic_scf = _TRUE_;
   pba->scf_parameters = NULL;
@@ -3498,14 +3962,29 @@ int input_default_params(
   pba->Omega0_k = 0.;
   pba->K = 0.;
   pba->sgnK = 0;
-  pba->Omega0_lambda = 1.-pba->Omega0_k-pba->Omega0_g-pba->Omega0_ur-pba->Omega0_b-pba->Omega0_cdm-pba->Omega0_ncdm_tot-pba->Omega0_dcdmdr;
+  pba->Omega0_lambda = 1.-pba->Omega0_k-pba->Omega0_g-pba->Omega0_ur-pba->Omega0_b-pba->Omega0_cdm-pba->Omega0_ncdm_tot-pba->Omega0_dcdmdr-pba->Omega0_gdm;
+  // TK added GDM to above as well. Technically, TK subtracted it.
+  pba->w_free_function_number_of_knots = 0;
+  pba->w_free_function_logz_interpolation_above_z = 1e30; //arbitrarily large number, no log interpolation in the default case.
+  pba->w_free_function_table_is_log = _FALSE_;
+  pba->w_free_function_interpolation_is_linear = _TRUE_; //default: we linearly interpolate rho and rho'. Found to be better to avoid weird behavior at low-z.
+
   pba->Omega0_fld = 0.;
   pba->a_today = 1.;
   pba->w0_fld=-1.;
   pba->wa_fld=0.;
   pba->cs2_fld=1.;
+  ppt->cs2_is_w = _FALSE_;
+  pba->w_fld_parametrization = CPL;
+  pba->scf_perturbs_like_fluid = _FALSE_;
+  pba->a_c = NULL;
+  pba->Omega_many_fld = NULL;
+  pba->n_fld = 0;
+  pba->n_pheno_axion = NULL;
   pba->use_ppf = _TRUE_;
+  ppt->use_big_theta_fld = _FALSE_;
   pba->c_gamma_over_c_fld = 0.4;
+  pba->fld_has_perturbations = _TRUE_;
 
   pba->shooting_failed = _FALSE_;
 
@@ -3665,6 +4144,10 @@ int input_default_params(
 
   ppt->three_ceff2_ur=1.;
   ppt->three_cvis2_ur=1.;
+
+  // TK added GDM parameters to perturbation structure because that's how it's coded now.
+  pba->ceff2_gdm = 0.;
+  pba->cvis2_gdm = 0.;
 
   ppt->z_max_pk=0.;
 
@@ -3843,7 +4326,7 @@ int input_default_precision ( struct precision * ppr ) {
 
   /* for bbn */
   sprintf(ppr->sBBN_file,__CLASSDIR__);
-strcat(ppr->sBBN_file,"/bbn/sBBN_2017.dat");
+  strcat(ppr->sBBN_file,"/bbn/sBBN_2017.dat");
   /*For energy injection from DM annihilation or decays */
   sprintf(ppr->energy_injec_coeff_file,__CLASSDIR__);
   //strcat(ppr->energy_injec_coeff_file,"/DM_Annihilation_files/DM_Annihilation_coeff.dat");
@@ -3947,6 +4430,8 @@ strcat(ppr->sBBN_file,"/bbn/sBBN_2017.dat");
   ppr->l_max_pol_g=10;
   ppr->l_max_dr=17;
   ppr->l_max_ur=17;
+  // TK added GDM l_max here. Should it be 17? Do we need it?
+  ppr->l_max_gdm=17;
   ppr->l_max_ncdm=17;
   ppr->l_max_g_ten=5;
   ppr->l_max_pol_g_ten=5;
@@ -3966,7 +4451,7 @@ strcat(ppr->sBBN_file,"/bbn/sBBN_2017.dat");
   ppr->radiation_streaming_trigger_tau_over_tau_k = 45.;
   ppr->radiation_streaming_trigger_tau_c_over_tau = 5.;
 
-  ppr->ur_fluid_approximation = ufa_CLASS;
+  ppr->ur_fluid_approximation = ufa_none;
   ppr->ur_fluid_trigger_tau_over_tau_k = 30.;
 
   ppr->ncdm_fluid_approximation = ncdmfa_CLASS;

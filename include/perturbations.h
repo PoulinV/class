@@ -181,7 +181,11 @@ struct perturbs
 
   double three_ceff2_ur;/**< 3 x effective squared sound speed for the ultrarelativistic perturbations */
   double three_cvis2_ur;/**< 3 x effective viscosity parameter for the ultrarelativistic perturbations */
-
+  /* TK added GDM here */
+  // Unlike w/ ur species, I'm not defining 3*c_eff^2, but simply ceff^2 for gdm
+  double ceff2_gdm;/**< 3 x effective squared sound speed for the GDM perturbations */
+  double cvis2_gdm;/**< 3 x effective viscosity parameter for the GDM perturbations */
+  short cs2_is_w;
   double z_max_pk; /**< when we compute only the matter spectrum / transfer functions, but not the CMB, we are sometimes interested to sample source functions at very high redshift, way before recombination. This z_max_pk will then fix the initial sampling time of the sources. */
 
   //@}
@@ -240,6 +244,9 @@ struct perturbs
   short has_source_delta_g;    /**< do we need source for delta of gammas? */
   short has_source_delta_b;    /**< do we need source for delta of baryons? */
   short has_source_delta_cdm;  /**< do we need source for delta of cold dark matter? */
+  /* TK added GDM here */
+  short has_source_delta_gdm;   /**< do we need source for delta of generalised dark matter? */
+
   short has_source_delta_dcdm; /**< do we need source for delta of DCDM? */
   short has_source_delta_fld;  /**< do we need source for delta of dark energy? */
   short has_source_delta_scf;  /**< do we need source for delta from scalar field? */
@@ -250,6 +257,9 @@ struct perturbs
   short has_source_theta_g;    /**< do we need source for theta of gammas? */
   short has_source_theta_b;    /**< do we need source for theta of baryons? */
   short has_source_theta_cdm;  /**< do we need source for theta of cold dark matter? */
+  /* TK added GDM here */
+  short has_source_theta_gdm;   /**< do we need source for theta of generalised dark matter? */
+
   short has_source_theta_dcdm; /**< do we need source for theta of DCDM? */
   short has_source_theta_fld;  /**< do we need source for theta of dark energy? */
   short has_source_theta_scf;  /**< do we need source for theta of scalar field? */
@@ -277,6 +287,9 @@ struct perturbs
   int index_tp_delta_g;   /**< index value for delta of gammas */
   int index_tp_delta_b;   /**< index value for delta of baryons */
   int index_tp_delta_cdm; /**< index value for delta of cold dark matter */
+  /* TK added GDM here */
+  int index_tp_delta_gdm; /**< index value for delta of generalised dark matter */
+
   int index_tp_delta_dcdm;/**< index value for delta of DCDM */
   int index_tp_delta_fld;  /**< index value for delta of dark energy */
   int index_tp_delta_scf;  /**< index value for delta of scalar field */
@@ -290,12 +303,17 @@ struct perturbs
   int index_tp_theta_g;    /**< index value for theta of gammas */
   int index_tp_theta_b;    /**< index value for theta of baryons */
   int index_tp_theta_cdm;  /**< index value for theta of cold dark matter */
+  /* TK added GDM here */
+  int index_tp_theta_gdm;  /**< index value for theta of generalised dark matter */
+
   int index_tp_theta_dcdm; /**< index value for theta of DCDM */
   int index_tp_theta_fld;  /**< index value for theta of dark energy */
   int index_tp_theta_scf;  /**< index value for theta of scalar field */
   int index_tp_theta_ur;   /**< index value for theta of ultra-relativistic neutrinos/relics */
   int index_tp_theta_dr;   /**< index value for F1 of decay radiation */
   int index_tp_theta_ncdm1;/**< index value for theta of first non-cold dark matter species (e.g. massive neutrinos) */
+
+  int index_tp_delta_p_over_rho_fld;  /**< index value for delta_p_over_rho of dark energy */
 
   int index_tp_phi;          /**< index value for metric fluctuation phi */
   int index_tp_phi_prime;    /**< index value for metric fluctuation phi' */
@@ -309,6 +327,8 @@ struct perturbs
   int * tp_size; /**< number of types tp_size[index_md] included in computation for each mode */
 
   //@}
+
+  short use_big_theta_fld;
 
   /** @name - list of k values for each mode */
 
@@ -401,10 +421,20 @@ struct perturb_vector
   int index_pt_theta_b;   /**< baryon velocity */
   int index_pt_delta_cdm; /**< cdm density */
   int index_pt_theta_cdm; /**< cdm velocity */
+  /* TK added GDM here */
+  int index_pt_delta_gdm; /**< gdm density */
+  int index_pt_theta_gdm; /**< gdm velocity */
+  int index_pt_shear_gdm; /**< shear of gdm */
+  // TK removed this
+  int index_pt_l3_gdm;    /**< l=3 of gdm */
+  int l_max_gdm;          /**< max momentum in Boltzmann hierarchy (at least 3) */
+
   int index_pt_delta_dcdm; /**< dcdm density */
   int index_pt_theta_dcdm; /**< dcdm velocity */
   int index_pt_delta_fld;  /**< dark energy density in true fluid case */
+  int index_pt_delta_p_over_rho_fld;  /**< dark energy delta_p_over_rho in true fluid case */
   int index_pt_theta_fld;  /**< dark energy velocity in true fluid case */
+  int index_pt_big_theta_fld;  /**< dark energy velocity divided by (1+w_fld) in true fluid case */
   int index_pt_Gamma_fld;  /**< unique dark energy dynamical variable in PPF case */
   int index_pt_phi_scf;  /**< scalar field density */
   int index_pt_phi_prime_scf;  /**< scalar field velocity */
@@ -511,10 +541,10 @@ struct perturb_workspace
   double delta_m;	/**< relative density perturbation of all non-relativistic species */
   double theta_m;	/**< velocity divergence theta of all non-relativistic species */
 
-  double delta_rho_fld;        /**< density perturbation of fluid, not so trivial in PPF scheme */
-  double rho_plus_p_theta_fld; /**< velocity divergence of fluid, not so trivial in PPF scheme */
+  double * delta_rho_fld;        /**< density perturbation of fluid, not so trivial in PPF scheme */
+  double * rho_plus_p_theta_fld; /**< velocity divergence of fluid, not so trivial in PPF scheme */
   double S_fld;                /**< S quantity sourcing Gamma_prime evolution in PPF scheme (equivalent to eq. 15 in 0808.3125) */
-  double Gamma_prime_fld;      /**< Gamma_prime in PPF scheme (equivalent to eq. 14 in 0808.3125) */
+  double * Gamma_prime_fld;      /**< Gamma_prime in PPF scheme (equivalent to eq. 14 in 0808.3125) */
 
   FILE * perturb_output_file; /**< filepointer to output file*/
   int index_ikout;            /**< index for output k value (when k_output_values is set) */
