@@ -424,16 +424,26 @@ class accreting_model(model):
 		if redshift is None:
 			redshift = get_redshift()
 
+
 		from .common import trapz,  logConversion
 		from .special_functions import luminosity_accreting_bh
-		E = logConversion(logEnergies)
-		spec_ph = luminosity_accreting_bh(E,recipe,PBH_mass)
-		spec_el = np.zeros_like(spec_ph)
-		spec_oth = np.zeros_like(spec_ph)
-		normalization = trapz((spec_ph+spec_el)*E**2*np.log(10),logEnergies)*np.ones_like(redshift)
 
-		spec_photons = np.zeros((len(spec_el),len(redshift)))
-		spec_photons[:,:] = spec_ph[:,None]
-		spec_electrons = np.zeros((len(spec_el),len(redshift)))
+		# mass_at_z = PBH_accretion_mass_at_z(PBH_mass_ini, z_accretion, PBH_mass_final, redshift=redshift, **DarkOptions)
+
+		E = logConversion(logEnergies)
+		spec_photons = np.asarray(luminosity_accreting_bh(E,recipe,PBH_mass[-1,:],redshift)).T
+		spec_electrons = np.zeros_like(spec_photons)
+		spec_oth = np.zeros_like(spec_photons)
+		# spec_electrons = np.zeros((len(spec_el),len(redshift)))
+		normalization = []
+		for index_z in range(len(redshift)):
+		          normalization.append(trapz((spec_photons[:,index_z])*E**2*np.log(10),logEnergies))
+
+
+
+		# spec_photons = np.zeros((len(spec_el),len(redshift)))
+		# spec_photons[:,:] = spec_ph[:,None]
+
+
 
 		model.__init__(self, spec_electrons, spec_photons, normalization, logEnergies, 0)

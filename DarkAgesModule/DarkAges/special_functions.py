@@ -2,14 +2,17 @@ import numpy as np
 import os
 import sys
 import dill
-from scipy.special import erf
+from scipy.special import erfc
 
 from .__init__ import DarkAgesError as err
 data_dir = os.path.join( os.path.dirname(os.path.realpath( __file__ )), 'data' )
 
-def boost_factor_halos(redshift,zh,fh):
-	ret = 1 + fh*erf(redshift/(1+zh))/redshift**3
+def boost_factor_halos(redshift,zh=1.,fh=0.):
+	print redshift,zh,fh
+	ret = 1 + fh*erfc(redshift/(1+zh))/redshift**3
 	return ret
+
+# PBH_accretion_mass_at_z(PBH_mass_ini,z_accretion,PBH_mass_final,redshift=None, **DarkOptions)
 
 def secondaries_from_cirelli(logEnergies,mass,primary, **DarkOptions):
 	from .common import sample_spectrum
@@ -75,7 +78,7 @@ def secondaries_from_simple_decay(E_secondary, E_primary, primary):
 	out /= (np.log(10)*E_secondary)[:,None]
 	return out
 
-def luminosity_accreting_bh(Energy,recipe,PBH_mass):
+def luminosity_accreting_bh(Energy,recipe,PBH_mass,redshift):
 	if not hasattr(Energy,'__len__'):
 		Energy = np.asarray([Energy])
 	if recipe=='spherical_accretion':
@@ -83,11 +86,21 @@ def luminosity_accreting_bh(Energy,recipe,PBH_mass):
 		Ts = 0.4*511e3
 		Emin = 1
 		Emax = Ts
-		out = np.zeros_like(Energy)
-		Emin_mask = Energy > Emin
-		# Emax_mask = Ts > Energy
-	 	out[Emin_mask] = Energy[Emin_mask]**(-a)*np.exp(-Energy[Emin_mask]/Ts)
-		out[~Emin_mask] = 0.
+		out = []
+		tmp_out = []
+		for index_z in range(len(redshift)):
+			tmp_out = []
+			for enj in Energy:
+				if enj > Emin:
+					tmp_out.append(enj**(-a)*np.exp(-enj/Ts)/enj)	#we will remultiply by enj later
+				else:
+					tmp_out.append(0)
+			out.append(tmp_out)
+		# out = np.zeros_like(Energy)
+		# Emin_mask = Energy > Emin
+		# # Emax_mask = Ts > Energy
+	 	# out[Emin_mask] = Energy[Emin_mask]**(-a)*np.exp(-Energy[Emin_mask]/Ts)
+		# out[~Emin_mask] = 0.
 		# out[~Emax_mask] = 0.
 
 	elif recipe=='disk_accretion':
@@ -95,14 +108,22 @@ def luminosity_accreting_bh(Energy,recipe,PBH_mass):
 		Emin = (10/PBH_mass)**0.5
 		# print a, Emin
 		Ts = 0.4*511e3
-		out = np.zeros_like(Energy)
-		Emin_mask = Energy > Emin
-		out[Emin_mask] = Energy[Emin_mask]**(-a)*np.exp(-Energy[Emin_mask]/Ts)
-		out[~Emin_mask] = 0.
-		Emax_mask = Ts > Energy
-		out[~Emax_mask] = 0.
+		out = np.array([redshift,np.zeros_like(Energy)])
+		out = []
+		tmp_out = []
+		for index_z in range(len(redshift)):
+			tmp_out = []
+			for enj in Energy:
+				if enj > Emin[index_z]:
+					tmp_out.append(enj**(-a[index_z])*np.exp(-enj/Ts)/enj)
+				else:
+					tmp_out.append(0)
+			out.append(tmp_out)
+		# print out
+		# out[~Emin_mask] = 0.
+		# Emax_mask = Ts > Energy
 	else:
 		from .__init__ import DarkAgesError as err
 		raise err('I cannot understand the recipe "{0}"'.format(recipe))
 	# print out, Emax_mask
-	return out/Energy #We will remultiply by Energy later in the code
+	return out #We will remultiply by Energy later in the code

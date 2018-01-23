@@ -71,9 +71,9 @@ parser.add_option("--log10mass", type="float", dest='log10mass',default=None,
 parser.add_option("--tdec", type='float', dest='t_dec',
                   help="Define the lifetime of the DM-candidate.")
 parser.add_option("--zh", type='float', dest='zh',
-                  help="Define the onset of halos formation.")
+                  help="Define the onset of halos formation or PBH growth.")
 parser.add_option("--fh", type='float', dest='fh',
-                  help="Define the amplitude of DM halos.")
+                  help="Define the amplitude of DM halos or PBH final mass.")
 parser.add_option("", "--use-background", dest="background", nargs=3, type="float", default=(67.27, 0.3156, 8e-5),
                   help="Define the background parameters (H0, Omega_m, Omega_r) for the calculation of H(z) and t(z)")
 parser.add_option("--extra-options", dest="extra", metavar="EXTRA.yaml",
@@ -177,7 +177,10 @@ if options.log10mass is not None:
 # (At this point we also catch the case when the script is executed with no options, which is a pointless thing to do)
 if options.mass is None:
 	raise DarkAgesError("You are new here, right? At least it seems that executed the script without any options. Re-run with --help to see what the script can do or check out the documentation.\n\nIn case you are familiar with the usage of that script, this message means the following to you:\nYou did not specified the options --file and --model in the input, hence I assume you want me to calculate f(z) live from scratch. But to do so the mass is missing and without it I cannot proceed. Use either --mass or --log10mass (and please do not use both)")
-
+if options.fh is None:
+	options.fh = 0.
+if options.zh is None:
+	options.zh = 1.
 if options.mass <= 0:
 	raise DarkAgesError('You entered an invalid value for the mass. It needs to be positive and non zero.')
 
@@ -187,7 +190,7 @@ if options.injection_history == 'evaporating_PBH':
 if options.injection_history == 'accreting_PBH' and ((options.accretion_recipe is None)):
 	raise DarkAgesError('When choosing the injection history: "accreting_PBH" you need to specify the accretion recipe: spherical_accretion or disk_accretion.')
 if options.injection_history == 'accreting_PBH':
-	sys.exit( recipes.accreting_PBH(options.mass, options.accretion_recipe, transfer_functions, **DarkOptions) )
+	sys.exit( recipes.accreting_PBH(options.mass, options.accretion_recipe, transfer_functions,zh=options.zh, fh=options.fh, **DarkOptions) )
 
 if options.spectrum is not None:
 	if options.branchings is None:
