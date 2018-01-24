@@ -186,13 +186,17 @@ double eps_over_mdot_pbh(double Mpbh, double z, double xe, double Teff, int coll
 
 /* Luminosity of a single PBH in erg/s*/
 double L_pbh(double Mpbh, double z, double xe, double Teff, int coll_ion) {
-  double Mdot, mdot, eff;
+  double Mdot, mdot, eff, result;
 
   Mdot = Mdot_pbh(Mpbh, z, xe, Teff);
   mdot = Mdot / (1.4e17 * Mpbh);        /* Mdot c^2 / L_Eddington */
+  // if(mdot>1)mdot = 1;
   eff  = mdot *eps_over_mdot_pbh(Mpbh, z, xe, Teff, coll_ion);
-  // printf("%e %e %e\n",z,mdot,eff*Mdot/(1.4e17 * Mpbh));
-  return eff * Mdot * 9e20;  /* L = epsilon Mdot c^2 */
+  // if(eff*Mdot/(1.4e17 * Mpbh)>1)printf("%e %e %e\n",z,mdot,eff*Mdot/(1.4e17 * Mpbh));
+  result = eff * Mdot * 9e20;
+  // if(result > 1.3e17 * Mpbh * 9e20)printf("result %e z %e \n",result,z);
+  if(result > 1.4e17 * Mpbh * 9e20)result=1.3e37 * Mpbh;
+  return result;  /* L = epsilon Mdot c^2 */
 }
 
 /* Very approximate value of the rms relative velocity, in cm/s */
@@ -242,13 +246,24 @@ double L_pbh_av(double Mpbh, double z, double xe, double Tgas, int coll_ion) {
 double dEdtdV_accreting_PBH(double z, double xe, double Tgas, INJ_PARAMS *params) {
   double xe_used = (xe < 1.? xe : 1.); /* Since we are not accounting for Helium */
   double energy_rate = 0;
+  double PBH_mass_at_z,Boost_factor;
+  double width,boost_before,boost_after;
   // xe_used = feedback + (1-feedback)*xe_used;
   // Old feedback - no feedback model, where xe = 1 throughout was assumed in the strong feedback case
   if (params->fpbh > 0. && params->Mpbh > 0.) {
 
+    if(params->PBH_accretion_z_mass_increase>0. && params->PBH_accretion_final_mass >0){
+    boost_before = params->Mpbh;
+    boost_after = params->PBH_accretion_final_mass;
+    Boost_factor = (boost_before-boost_after)*(tanh((z - params->PBH_accretion_z_mass_increase)/ params->PBH_accretion_width_mass_increase) + 1)/2 + boost_after;
+    // Boost_factor = preco->PBH_accretion_final_mass*erfc((1+z)/(1+preco->PBH_accretion_z_mass_increase))/pow(1+z,3);
+    }
+    else Boost_factor = 0;
+    PBH_mass_at_z = params->Mpbh+Boost_factor;
+    // printf("f_pbh %e z %e \n", params->fpbh,z);
     if(params->PBH_accretion_recipe == 0){
       // energy_rate = 7.07e-52/Mpbh * cube(1.+z) * fpbh *L_pbh(Mpbh, z, xe_used, Tgas, coll_ion); /** alternative computation using veff instead of the numerical average */
-      energy_rate = 7.07e-52/params->Mpbh * cube(1.+z) * params->fpbh *L_pbh_av(params->Mpbh, z, xe_used, Tgas, params->coll_ion);
+      energy_rate = 7.07e-52/params->Mpbh * cube(1.+z) * params->fpbh *L_pbh_av(PBH_mass_at_z, z, xe_used, Tgas, params->coll_ion);
     }
     else if(params->PBH_accretion_recipe == 1){
       energy_rate = 7.07e-52/params->Mpbh * cube(1.+z) * params->fpbh *L_pbh_ADAF(z, xe_used, Tgas, params);

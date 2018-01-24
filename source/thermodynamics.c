@@ -424,7 +424,7 @@ int thermodynamics_init(
   class_test((pth->YHe < _YHE_SMALL_)||(pth->YHe > _YHE_BIG_),
              pth->error_message,
              "Y_He=%g out of bounds (%g<Y_He<%g)",pth->YHe,_YHE_SMALL_,_YHE_BIG_);
-  
+
   /** Initialize annihilation coefficient (First check if exotic energy injection is demanded) */
 
   if(pth->annihilation >0 || pth->decay_fraction > 0 || pth->PBH_accreting_mass > 0 || pth->PBH_evaporating_mass > 0){
@@ -433,58 +433,58 @@ int thermodynamics_init(
                  pth->error_message,
                  pth->error_message);
     }
-    
+
     if(pth->has_on_the_spot==_FALSE_ && pth->energy_repart_coefficient!=no_factorization){
       class_call(thermodynamics_annihilation_f_eff_init(ppr,pba,preco),
                  preco->error_message,
                  preco->error_message);
     }
   }
-  
+
   /** - check energy injection parameters */
-  
+
   class_test((pth->annihilation<0),
 	     pth->error_message,
 	     "annihilation parameter cannot be negative");
-  
+
   class_test((pth->annihilation>1.e-4),
 	     pth->error_message,
 	     "annihilation parameter suspiciously large (%e, while typical bounds are in the range of 1e-7 to 1e-6)",
 	     pth->annihilation);
-  
+
   class_test(pth->PBH_evaporating_mass > 0 && pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,pth->error_message,
 	     "The value of 'pth->PBH_fraction' that you enter is suspicious given the mass you chose. You are several orders of magnitude above the limit. The code doesn't handle well too high energy injection. Please choose  'pth->PBH_fraction < 1e-4'. ")
-    
+
     // class_test((pth->annihilation_f_halo>0) && (pth->recombination==recfast),
     //            pth->error_message,
     //            "Switching on DM annihilation in halos requires using HyRec instead of RECFAST. Otherwise some values go beyond their range of validity in the RECFAST fits, and the thermodynamics module fails. Two  solutions: add 'recombination = HyRec' to your input, or set 'annihilation_f_halo = 0.' (default).");
-    
-    
-    
+
+
+
     class_test((pth->annihilation>0)&&(pba->has_cdm==_FALSE_),
                pth->error_message,
                "CDM annihilation effects require the presence of CDM!");
-  
+
   // class_test((pth->annihilation_f_halo>0) && (pth->recombination==recfast),
   //            pth->error_message,
   //            "Switching on DM annihilation in halos requires using HyRec instead of RECFAST. Otherwise some values go beyond their range of validity in the RECFAST fits, and the thermodynamics module fails. Two   solutions: add 'recombination = HyRec' to your input, or set 'annihilation_f_halo = 0.' (default).");
-  
+
   class_test((pth->annihilation_f_halo<0),
 	     pth->error_message,
 	     "Parameter for DM annihilation in halos cannot be negative");
-  
+
   class_test((pth->annihilation_z_halo<0),
 	     pth->error_message,
 	     "Parameter for DM annihilation in halos cannot be negative");
-  
+
   if (pth->thermodynamics_verbose > 0)
     if ((pth->annihilation >0) && (pth->reio_parametrization == reio_none) && (ppr->recfast_Heswitch >= 3) && (pth->recombination==recfast))
       printf("Warning: if you have DM annihilation and you use recfast with option recfast_Heswitch >= 3, then the expression for CfHe_t and dy[1] becomes undefined at late times, producing nan's. This is however   masked by reionization if you are not in reio_none mode.");
-  
+
   class_test((pth->decay_fraction<0),
 	     pth->error_message,
 	     "decay parameter cannot be negative");
-  
+
   class_test((pth->decay_fraction>0)&&(pba->has_cdm==_FALSE_),
 	     pth->error_message,
 	     "CDM decay effects require the presence of CDM!");
@@ -2225,6 +2225,7 @@ int thermodynamics_accreting_pbh_energy_injection(
                                                 ){
 
   double rho_cdm_today;
+  double PBH_mass_at_z,Boost_factor;
   double tau;
   int last_index_back;
   double * pvecback;
@@ -2235,7 +2236,7 @@ int thermodynamics_accreting_pbh_energy_injection(
   double lambda_1,lambda_2,lambda_ad,lambda_iso,gamma_cooling,beta_compton_drag, T_s, T_ion, Y_s, J,tau_cooling;
   double Value_min, Value_med, Value_max, a=0, epsilon_0=0.1;
   rho_cdm_today = pow(pba->H0*_c_/_Mpc_over_m_,2)*3/8./_PI_/_G_*(pba->Omega0_cdm)*_c_*_c_; /* energy density in J/m^3 */
-
+  double width,boost_before,boost_after;
   class_alloc(pvecback,pba->bg_size*sizeof(double),pba->error_message);
   class_call(background_tau_of_z(pba,
                                  z,
@@ -2252,7 +2253,22 @@ int thermodynamics_accreting_pbh_energy_injection(
              pba->error_message,
              preco->error_message);
 
-
+        if(preco->PBH_accretion_z_mass_increase>0. && preco->PBH_accretion_final_mass >0){
+        boost_before = 1;
+        boost_after = preco->PBH_accretion_final_mass;
+        Boost_factor = -(boost_after-boost_before)*(tanh((z - preco->PBH_accretion_z_mass_increase)/ preco->PBH_accretion_width_mass_increase) + 1)/2 + boost_after;
+        // printf("Boost_factor %e preco->PBH_accretion_width_mass_increase %e %e\n", Boost_factor,preco->PBH_accretion_width_mass_increase,preco->PBH_accretion_z_mass_increase);
+        // Boost_factor = preco->PBH_accretion_final_mass*erfc((1+z)/(1+preco->PBH_accretion_z_mass_increase))/pow(1+z,3);
+        }
+        else Boost_factor = 0;
+        PBH_mass_at_z = preco->PBH_accreting_mass*(1+Boost_factor/preco->PBH_accreting_mass);
+        FILE * file = NULL;
+        // class_open(file,"PBH_mass_1e6_2e12.dat", "a",preco->error_message);
+        // // class_open(file,"PBH_mass_1e2_5e8.dat", "a",preco->error_message);
+        // // class_open(file,"PBH_mass_1e4_2e10.dat", "a",preco->error_message);
+        // fprintf(file,"%e %e\n", z,PBH_mass_at_z);
+        // // printf("%e %e\n", z,PBH_mass_at_z);
+        // fclose(file);
         c_s = 5.7e3*pow(preco->Tm_tmp/2730,0.5);//conversion km en m
         M_sun = 2e30; // in Kg
         n_gas = 200*1e6*pow((1+z)/1000,3); // 1e6 = conversion cm^-3 en m^-3;
@@ -2263,7 +2279,7 @@ int thermodynamics_accreting_pbh_energy_injection(
         T_infinity = preco->Tm_tmp*_eV_over_Kelvin_*1e-6; //Temperature in MeV
         /** Disk accretion from Poulin et al. 1707.04206 */
         if(preco->PBH_accretion_recipe == disk_accretion){
-            L_ed = 4*_PI_*_G_*preco->PBH_accreting_mass*M_sun*m_p*1e6/_eV_over_joules_/(_sigma_*_c_);
+            L_ed = 4*_PI_*_G_*PBH_mass_at_z*M_sun*m_p*1e6/_eV_over_joules_/(_sigma_*_c_);
             M_ed_dot= 10*L_ed/(_c_*_c_);
             M_crit = 0.01*M_ed_dot;
             v_B = sqrt((1+x_e)*T_infinity/m_p)*_c_;
@@ -2279,7 +2295,7 @@ int thermodynamics_accreting_pbh_energy_injection(
 
             lambda = preco->PBH_accretion_eigenvalue;
             rho = pvecback[pba->index_bg_rho_b]/pow(_Mpc_over_m_,2)*3/8./_PI_/_G_*_c_*_c_; /* energy density in kg/m^3 */
-            M_b_dot = 4*_PI_*lambda*pow(_G_*preco->PBH_accreting_mass*M_sun,2)*rho*pow(v_eff,-3.);
+            M_b_dot = 4*_PI_*lambda*pow(_G_*PBH_mass_at_z*M_sun,2)*rho*pow(v_eff,-3.);
             if(preco->PBH_ADAF_delta == 1e-3){
               Value_min = 7.6e-5;
               Value_med = 4.5e-3;
@@ -2366,8 +2382,8 @@ int thermodynamics_accreting_pbh_energy_injection(
             v_l = preco->PBH_relative_velocities*1e3; // converted to m/s.
             v_eff = pow(v_l*v_l+v_B*v_B,0.5);
           }
-          r_B = _G_*preco->PBH_accreting_mass*M_sun*pow(v_eff,-2); // in m
-          t_B = _G_*preco->PBH_accreting_mass*M_sun/pow(v_eff,3); // in s
+          r_B = _G_*PBH_mass_at_z*M_sun*pow(v_eff,-2); // in m
+          t_B = _G_*PBH_mass_at_z*M_sun/pow(v_eff,3); // in s
           beta_compton_drag = 4./3*x_e_infinity*_sigma_*rho_cmb*t_B/(m_p)*_c_;
           gamma_cooling = 2*m_p/(m_e*(1+x_e_infinity))*beta_compton_drag;
           lambda_iso = 0.25*exp(1.5);
@@ -2383,7 +2399,7 @@ int thermodynamics_accreting_pbh_energy_injection(
           T_s = m_e * Y_s*pow(1+Y_s/0.27,-1./3); // in MeV
           if(T_s/m_e > 1)  J = 27/(2*_PI_)*(log(2*T_s/(m_e)*exp(-0.577)+0.08)+4./3);
           else J = 4/_PI_*sqrt(2/_PI_)*pow(T_s/m_e,-0.5)*(1+5.5*pow(T_s/m_e,1.25));
-          L_ed = 4*_PI_*_G_*preco->PBH_accreting_mass*M_sun*m_p*1e6/_eV_over_joules_/(_sigma_*_c_);
+          L_ed = 4*_PI_*_G_*PBH_mass_at_z*M_sun*m_p*1e6/_eV_over_joules_/(_sigma_*_c_);
           L_acc = 1./137*T_s/(m_p)*J*pow(M_b_dot*_c_*_c_,2)/L_ed;
          }
 
@@ -4480,6 +4496,9 @@ class_stop(pth->error_message,
            hyrec_data.cosmo->inj_params->z_start_reio_stars = pth->z_start_reio_stars; /**< Controls the beginning of star reionisation, the SFR experiences is put to 0 above this value. */
            hyrec_data.cosmo->fsR = alpha_ratio;
            hyrec_data.cosmo->meR = me_ratio;
+           hyrec_data.cosmo->inj_params->PBH_accretion_z_mass_increase = pth->PBH_accretion_z_mass_increase;
+           hyrec_data.cosmo->inj_params->PBH_accretion_width_mass_increase = pth->PBH_accretion_width_mass_increase;
+           hyrec_data.cosmo->inj_params->PBH_accretion_final_mass = pth->PBH_accretion_final_mass;
            hyrec_data.cosmo->inj_params->Mpbh = pth->PBH_accreting_mass;
            hyrec_data.cosmo->inj_params->fpbh = pth->PBH_fraction;
            hyrec_data.cosmo->inj_params->coll_ion = pth->coll_ion_pbh;
@@ -4644,6 +4663,9 @@ int fill_recombination_structure(struct precision * ppr,
   preco->PBH_ADAF_delta = pth->PBH_ADAF_delta;
   preco->PBH_accretion_eigenvalue = pth->PBH_accretion_eigenvalue;
   preco->PBH_relative_velocities = pth->PBH_relative_velocities;
+  preco->PBH_accretion_final_mass = pth->PBH_accretion_final_mass;
+  preco->PBH_accretion_z_mass_increase = pth->PBH_accretion_z_mass_increase;
+  preco->PBH_accretion_width_mass_increase = pth->PBH_accretion_width_mass_increase;
   preco->PBH_accretion_recipe = pth->PBH_accretion_recipe;
   preco->energy_deposition_function = pth->energy_deposition_function;
   preco->PBH_evaporating_mass = pth->PBH_evaporating_mass;

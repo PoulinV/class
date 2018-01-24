@@ -8,9 +8,11 @@ from .__init__ import DarkAgesError as err
 data_dir = os.path.join( os.path.dirname(os.path.realpath( __file__ )), 'data' )
 
 def boost_factor_halos(redshift,zh=1.,fh=0.):
-	print redshift,zh,fh
 	ret = 1 + fh*erfc(redshift/(1+zh))/redshift**3
 	return ret
+def boost_factor_PBH_accretion(redshift,PBH_mass_ini,width,zh=1.,fh=0.):
+	ret = 1+fh+(PBH_mass_ini-fh)*(np.tanh((redshift-zh)/width)+1)/2
+	return ret/PBH_mass_ini
 
 # PBH_accretion_mass_at_z(PBH_mass_ini,z_accretion,PBH_mass_final,redshift=None, **DarkOptions)
 

@@ -91,7 +91,7 @@ def execute_script_file(ext_script_file, *arguments):
 		raise DarkAgesError('Failed to execute the script-file: "{0}"'.format(ext_script_file))
 
 ##### Functions related to loading a model from a file containing the input spectra (and mass)
-def accreting_PBH( PBH_mass_ini, recipe, transfer_functions, zh=1.,fh=0., logEnergies=None, redshift=None, **DarkOptions):
+def accreting_PBH( PBH_mass_ini, recipe, transfer_functions, width=0,zh=1.,fh=0., logEnergies=None, redshift=None, **DarkOptions):
 	u"""Wrapper for the calculation of :math:`f_c (z)` for a evaporating primordial
 	black hole (PBH) with a given initial mass :code:`PBH_mass_ini` and prionts
 	the table of them for all five deposition channels
@@ -120,10 +120,12 @@ def accreting_PBH( PBH_mass_ini, recipe, transfer_functions, zh=1.,fh=0., logEne
 
 	if logEnergies is None: logEnergies = get_logEnergies()
 	if redshift is None: redshift = get_redshift()
-	from .special_functions import boost_factor_halos
+	from .special_functions import boost_factor_PBH_accretion
 
-	PBH_mass = np.array([redshift, PBH_mass_ini*boost_factor_halos(redshift,zh,fh)])
+	PBH_mass = np.array([redshift, PBH_mass_ini*boost_factor_PBH_accretion(redshift,PBH_mass_ini,width,zh,fh)])
+	# print PBH_mass
 
+	# PBH_mass = np.array([redshift, PBH_mass_ini*boost_factor_halos(redshift,zh,fh)])
 	model_from_file = accreting_model(PBH_mass,recipe, logEnergies, redshift, **DarkOptions)
 	f_function = np.zeros( shape=(len(channel_dict),len(redshift)), dtype=np.float64 )
 	for channel in channel_dict:

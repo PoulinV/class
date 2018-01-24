@@ -1493,6 +1493,9 @@ int input_read_parameters(
     }
     class_read_double("PBH_accretion_eigenvalue",pth->PBH_accretion_eigenvalue); // If chosen to negative value, it will be set to the linear result.
     class_read_double("PBH_relative_velocities",pth->PBH_relative_velocities);
+    class_read_double("PBH_accretion_final_mass",pth->PBH_accretion_final_mass);
+    class_read_double("PBH_accretion_z_mass_increase",pth->PBH_accretion_z_mass_increase);
+    class_read_double("PBH_accretion_width_mass_increase",pth->PBH_accretion_width_mass_increase);
 
   }
   // class_test(pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,errmsg,
@@ -1812,6 +1815,18 @@ int input_read_parameters(
                 strcat(ppr->command_fz," --accretion_recipe=spherical_accretion");
               else if(pth->PBH_accretion_recipe==disk_accretion)
                 strcat(ppr->command_fz," --accretion_recipe=disk_accretion");
+              if(pth->PBH_accretion_final_mass > 0){
+                sprintf(string2," --fh %g",pth->PBH_accretion_final_mass);
+                strcat(ppr->command_fz,string2);
+              }
+              if(pth->PBH_accretion_z_mass_increase > 0){
+                sprintf(string2," --zh %g",pth->PBH_accretion_z_mass_increase);
+                strcat(ppr->command_fz,string2);
+              }
+              if(pth->PBH_accretion_width_mass_increase > 0){
+                sprintf(string2," --width %g",pth->PBH_accretion_width_mass_increase);
+                strcat(ppr->command_fz,string2);
+              }
               // else{
               //   class_test(1==0,errmsg,
               //     "You cannot use a accretion_recipe different from 'Ali_Haimoud' or 'ADAF_Simulation' if you are working with DarkAgesModule on. This will be updated in the future.\n");
@@ -3664,6 +3679,9 @@ int input_default_params(
   pth->PBH_fraction = 0.;
   pth->PBH_accretion_eigenvalue = 0.1; //Standard value in the ADAF scenario choose as benchmark.
   pth->PBH_relative_velocities = -1 ; //Standard value is the linear result extrapolated to PBH.
+  pth->PBH_accretion_final_mass = 0;
+  pth->PBH_accretion_z_mass_increase = 0; //no mass increase in the standard computation
+  pth->PBH_accretion_width_mass_increase = 0; //no mass increase in the standard computation
   pth->energy_repart_coefficient = GSVI;
   pth->u_gcdm=0.;
   pth->beta_gcdm=0.;

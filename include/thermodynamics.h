@@ -277,6 +277,9 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
   enum PBH_accretion_recipe PBH_accretion_recipe; /**< recipe to compute accretion from PBH */
   double PBH_accreting_mass; /**< mass from the PBH, in case of Dark Matter being high masses PBH */
 
+  double PBH_accretion_final_mass; /** final PBH mass when accretion is switched on*/
+  double PBH_accretion_z_mass_increase; /** characteristic redshift at which the mass increase starts*/
+  double PBH_accretion_width_mass_increase; /** characteristic width at which the mass increase happens*/
 
 
   int coll_ion_pbh;   /**< Specific to Ali_Haimoud accretion recipe. if 1: collisional ionizations (default, most conservative). if 0: photoionization by PBH radiation  */
@@ -507,6 +510,9 @@ struct recombination {
 
   double decay_fraction; /**< parameter describing CDM decay (f/tau, see e.g. 1109.6322)*/
   double PBH_accreting_mass; /**< mass from the PBH, in case of Dark Matter being PBH */
+  double PBH_accretion_final_mass; /** final PBH mass when accretion is switched on*/
+  double PBH_accretion_z_mass_increase; /** characteristic redshift at which the mass increase starts*/
+  double PBH_accretion_width_mass_increase; /** characteristic width at which the mass increase happens*/
   double PBH_ADAF_delta; /**<Specific to ADAF_Simulation accretion recipe. Determines the heating of the electrons in the disk, influencing the emissivity. Can be set to 0.5 (aggressive scenario) or 1e-3 (conservative). From Fie and Yuan 2012. */
   double PBH_accretion_eigenvalue; /**< The eigenvalue of the accretion rate. It rescales the perfect Bondi case. (see e.g. Ali-Haimoud & Kamionkowski 2016) */
   double PBH_relative_velocities; /**< The relative velocities between PBH and baryons in km/s. If negative, the linear result is chosen by the code. */

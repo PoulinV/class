@@ -42,6 +42,9 @@ typedef struct {
 
    double PBH_ADAF_delta;
    double PBH_accretion_eigenvalue;
+   double PBH_accretion_z_mass_increase;
+   double PBH_accretion_width_mass_increase;
+   double PBH_accretion_final_mass;
    int PBH_accretion_recipe;
 
    int annihil_coef_num_lines;
