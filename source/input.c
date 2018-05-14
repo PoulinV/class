@@ -270,34 +270,6 @@ int input_init(
       }
     }
   }
-  // class_call(parser_read_double(pfc,
-  //                               "f_ini_dcdm",
-  //                               &param1,
-  //                               &flag1,
-  //                               errmsg),
-  //            errmsg,
-  //            errmsg);
-  //
-  // if (flag1 == _TRUE_){
-  //   /** input_auxillary_target_conditions() takes care of the case where for
-  //       instance Omega_dcdmdr is set to 0.0.
-  //    */
-  //   index_target = 5;
-  //   class_call(input_auxillary_target_conditions(pfc,
-  //                                                index_target,
-  //                                                param1,
-  //                                                &aux_flag,
-  //                                                errmsg),
-  //              errmsg, errmsg);
-  //   if (aux_flag == _TRUE_){
-  //     printf("Found target: %s\n",target_namestrings[index_target]);
-  //     target_indices[unknown_parameters_size] = index_target;
-  //     fzw.required_computation_stage = MAX(fzw.required_computation_stage,target_cs[index_target]);
-  //     unknown_parameters_size++;
-  //   }
-  //   fprintf(stdout, "index_target = %d\n",index_target );
-  //
-  // }
 
   /** - case with unknown parameters */
   if (unknown_parameters_size > 0) {
@@ -329,7 +301,6 @@ int input_init(
     /** - --> go through all cases with unknown parameters: */
     for (counter = 0; counter < unknown_parameters_size; counter++){
       index_target = target_indices[counter];
-      // fprintf(stdout, "index_target = %d\n",index_target );
       class_call(parser_read_double(pfc,
                                     target_namestrings[index_target],
                                     &param1,
@@ -345,25 +316,8 @@ int input_init(
       fzw.unknown_parameters_index[counter]=pfc->size+counter;
       // substitute the name of the target parameter with the name of the corresponding unknown parameter
       strcpy(fzw.fc.name[fzw.unknown_parameters_index[counter]],unknown_namestrings[index_target]);
-      //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
     }
-    // class_call(parser_read_double(pfc,
-    //                               "f_ini_dcdm",
-    //                               &param1,
-    //                               &flag1,
-    //                               errmsg),
-    //          errmsg,
-    //          errmsg);
-    // if (flag1 == _TRUE_){
-    //   // store name of target parameter
-    //   fzw.target_name[counter] = index_target;
-    //   // store target value of target parameter
-    //   fzw.target_value[counter] = param1;
-    //   fzw.unknown_parameters_index[counter]=pfc->size+counter;
-    //   // substitute the name of the target parameter with the name of the corresponding unknown parameter
-    //   strcpy(fzw.fc.name[fzw.unknown_parameters_index[counter]],unknown_namestrings[index_target]);
-    //   //printf("%d, %d: %s\n",counter,index_target,target_namestrings[index_target]);
-    // }
+
 
     if (unknown_parameters_size == 1){
       /* We can do 1 dimensional root finding */
@@ -853,41 +807,15 @@ int input_read_parameters(
   // class_read_double("Gamma_dcdm",pba->Gamma_dcdm);
 
   /* Convert to Mpc */
-  // pba->Gamma_dcdm *= (1.e3 / _c_);
-  if (flag1 == _TRUE_)
+  if (flag1 == _TRUE_){
     pba->Gamma_dcdm = param1*(1.e3 / _c_);
-  if (flag2 == _TRUE_){
-  pba->Gamma_dcdm = 1/(param2/(1e9*365*24*3600))/1.02e-3*(1.e3 / _c_);
-  pba->tau_dcdm = param2;
-  // fprintf(stdout, "you have chosen Gamma = %e*H0, tau = %e s \n",pba->Gamma_dcdm/(1.e3 / _c_)/67,param2);
+    pba->tau_dcdm = 1/(param1*1.02e-3)*(1e9*365*24*3600); //convert to sec.
+    // fprintf(stdout, "you have chosen Gamma = %e km/s/Mpc, tau = %e s \n",pba->Gamma_dcdm/(1.e3 / _c_),pba->tau_dcdm);
   }
-
-  /** Input parameters relative to DM-baryon scattering */
-  class_read_double("u_gcdm",pth->u_gcdm); /** interaction rate */
-
-  /** Input parameters relative to excited DM-gamma scattering */
-  class_read_double("beta_gcdm",pth->beta_gcdm); /** The energy splitting (in unit of T0) */
-  class_read_double("alpha_gcdm_eV",pth->alpha_gcdm); /** One can pass either alpha_gcdm_eV = a_0 A_21 E_21^2 / (6 m_xhi T_0) (in eV) */
-  class_read_double("A_21_over_mchi",pth->A_21_over_mchi); /**  or the transition rate over the DM mass A_21 / m_xhi (dimensionless)*/
-  class_test((pth->alpha_gcdm != 0) && (pth->A_21_over_mchi != 0),
-              errmsg,
-              "You have 'alpha_gcdm != 0 ' and 'A_21_over_mchi != 0'. Please, set either 'alpha_gcdm_eV != 0' (in eV) or the transition rate 'A_21_over_mchi != 0', not both.");
-  if(pth->A_21_over_mchi!= 0) pth->alpha_gcdm = pth->A_21_over_mchi*pth->beta_gcdm*pth->beta_gcdm*pba->T_cmb*8.625e-5/6;
-
-  pth->alpha_gcdm *= 0.15637*1.e30; //eV to Mpc^-1
-
-  // class_read_double("alpha_gcdm_eV",alpha_gcdm_eV);
-  // pth->alpha_gcdm = alpha_gcdm_eV;
-
-  class_test(((pth->u_gcdm != 0) || (pth->beta_gcdm != 0) || (pth->alpha_gcdm != 0)) && (ppt->gauge == synchronous),
-             errmsg,
-             "DM-gamma interactions in the synchronous gauge are not yet implemented. Please work in the newtonian gauge by setting 'gauge = newtonian' in your '.ini' file.");
-  class_test((pth->beta_gcdm == 0) && (pth->alpha_gcdm != 0),
-             errmsg,
-             "You have 'alpha_gcdm != 0 ' but 'pth->beta_gcdm == 0'. Please, either switch off excited DM-gamma scattering (alpha_gcdm = 0) or pick a value for the energy splitting (beta_gcdm != 0).");
-  class_test((pth->beta_gcdm != 0) && (pth->alpha_gcdm == 0),
-             errmsg,
-             "You have 'beta_gcdm != 0 ' but 'pth->alpha_gcdm == 0'. Please, either switch off excited DM-gamma scattering (beta_gcdm = 0) or pick a value for the transition rate (alpha_gcdm_eV != 0 in eV or A_21_over_mchi != 0).");
+  if (flag2 == _TRUE_){
+  pba->Gamma_dcdm = 1/(param2/(1e9*365*24*3600))/1.02e-3*(1.e3 / _c_); //1 km s -1Mpc- 1 = 1.02* 10^- 3Gyr -1
+  pba->tau_dcdm = param2;
+  }
 
   /** - non-cold relics (ncdm) */
   class_read_int("N_ncdm",N_ncdm);
@@ -1372,7 +1300,7 @@ int input_read_parameters(
          /*
          pth->bp = 3.47;
          pth->cp = 2.73;
-        //  pth->dp = 5.87;
+         pth->dp = 5.87;
          pth->dp = 5.49;
          */
          pth->bp = 3.26;
@@ -1386,7 +1314,7 @@ int input_read_parameters(
          /*
          pth->bp = 3.05;
          pth->cp = 2.45;
-        //  pth->dp = 5.49;
+         pth->dp = 5.49;
          pth->dp = 5.87;
          */
          pth->bp = 3.26;
@@ -1453,10 +1381,9 @@ int input_read_parameters(
   class_read_double("annihilation_cross_section",pth->annihilation_cross_section);
   class_read_double("DM_mass",pth->DM_mass);
   class_test(pth->DM_mass <=0 && pth->annihilation_cross_section >0,errmsg,"you have annihilation_cross_section > 0 but DM_mass = 0. That is weird, please check your param file and set 'DM_mass' [GeV] to a non-zero value.\n");
-  //class_test(pth->annihilation_cross_section <=0 && pth->DM_mass >0,errmsg,"you have DM_mass > 0 but annihilation_cross_section = 0. That is weird, please check your param file and set 'annihilation_cross_section' [cm^3/s] to a non-zero value.\n");
 
   class_read_double("decay_fraction",pth->decay_fraction);
-  class_test(pth->annihilation_cross_section <=0 && pth->DM_mass >0 && pth->annihilation <= 0 && pth->decay_fraction <=0,errmsg,"you have DM_mass > 0 but both 'annihilation_cross_section' and 'annihilation' are zero. That is weird, please check your param file and set either 'annihilation_cross_section' [cm^3/s] or 'annihilation' [m^3/(kg s)] to a non-zero value.\n");
+  class_test(pth->annihilation_cross_section <=0 && pth->DM_mass >0 && pth->annihilation <= 0 && pth->decay_fraction <=0,errmsg,"you have DM_mass > 0 but 'annihilation_cross_section', 'annihilation', 'decay_fraction' are zero. That is weird, please check your param file and set either 'annihilation_cross_section' [cm^3/s], 'annihilation' [m^3/(kg s)] or 'decay_fraction' to a non-zero value.\n");
   class_test(pba->tau_dcdm <=0 && pth->decay_fraction >0,errmsg,"you have decay_fraction > 0 but Gamma_dcdm = 0. That is weird, please check your param file and set 'tau_dcdm' [s] or 'Gamma_dcdm' [km/s/Mpc] to a non-zero value.\n");
   class_test(pba->tau_dcdm >0 && pth->decay_fraction <=0,errmsg,"you have decay_fraction = 0 but tau_dcdm > 0. That is weird, please check your param file.\n");
   class_read_double("PBH_accreting_mass",pth->PBH_accreting_mass);
@@ -1480,7 +1407,6 @@ int input_read_parameters(
       if (strcmp(string1,"disk_accretion") == 0) {
         pth->PBH_accretion_recipe=disk_accretion;
         class_read_double("PBH_ADAF_delta",pth->PBH_ADAF_delta);
-        // if()
         flag2=_TRUE_;
       }
 
@@ -1498,8 +1424,8 @@ int input_read_parameters(
     class_read_double("PBH_accretion_width_mass_increase",pth->PBH_accretion_width_mass_increase);
 
   }
-  // class_test(pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,errmsg,
-  //   "The value of 'pth->PBH_fraction' that you enter is suspicious given the mass you chose. You are several orders of magnitude above the limit. The code doesn't handle well too high energy injection. Please choose 'pth->PBH_fraction < 1e-4'. ")
+  class_test(pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,errmsg,
+    "The value of 'pth->PBH_fraction' that you enter is suspicious given the mass you chose. You are several orders of magnitude above the limit. The code doesn't handle well too high energy injection. Please choose 'pth->PBH_fraction < 1e-4'. ")
   class_test(pth->PBH_accreting_mass<0.,errmsg,
     "You need to enter a mass for your PBH 'PBH_accreting_mass > 0.' (in Msun).");
   class_test(pth->PBH_accreting_mass>0. && pth->PBH_fraction == 0,errmsg,
@@ -1529,11 +1455,13 @@ int input_read_parameters(
   class_test(pth->recombination==cosmorec && pth->PBH_evaporating_mass!= 0.,
                errmsg,
                "Effect of evaporating PBH cannot yet be computed using cosmorec. Please, restart in recfast or hyrec mode.");
+  class_test(pth->recombination==cosmorec && pth->decay_fraction!= 0.,
+               errmsg,
+               "Effect of decaying DM cannot yet be computed using cosmorec. Please, restart in recfast or hyrec mode.");
   class_test(pth->PBH_ADAF_delta != 1e-3 && pth->PBH_ADAF_delta != 0.5  && pth->PBH_ADAF_delta != 0.1 ,errmsg,
    "The parameter 'pth->PBH_ADAF_delta' can currently only be set to 1e-3, 0.1 or 0.5.");
   class_test(pth->annihilation>0. && pth->annihilation_cross_section >0.,errmsg,"You gave both boost factor and annihilation parameter, please enter only one.");
   if(pth->DM_mass > 0 && pth->annihilation_cross_section >0.){
-      // double sigma_thermal = 3*pow(10,-32); // Sigma_v in m^3/s
       double conversion = 1.78*pow(10,-21); // Conversion GeV => Kg
       class_test(pth->DM_mass<=0.,errmsg,
         "You need to enter a mass for your dark matter particle 'm_DM > 0.' (in GeV).");
@@ -1878,7 +1806,6 @@ int input_read_parameters(
 
             class_call( parser_read_string(pfc,"DarkAges_command",&string2,&flag2,errmsg), errmsg, errmsg);
           	class_test(strlen(string2) == 0, errmsg, "You omitted to write a command to calculate the f(z) externally");
-          	// class_alloc(ppr->command_fz,(strlen(string2) + 1)*sizeof(char), errmsg);
           	strcat(ppr->command_fz, string2);
             /** An arbitrary number of external parameters to be used by the external command
                */
@@ -3683,10 +3610,6 @@ int input_default_params(
   pth->PBH_accretion_z_mass_increase = 0; //no mass increase in the standard computation
   pth->PBH_accretion_width_mass_increase = 0; //no mass increase in the standard computation
   pth->energy_repart_coefficient = GSVI;
-  pth->u_gcdm=0.;
-  pth->beta_gcdm=0.;
-  pth->alpha_gcdm=0.;
-  pth->A_21_over_mchi=0.;
   pth->Lambda_over_theoritical_Lambda = 1.;
 
   /** Tables specific to evaporating PBH */
@@ -3967,8 +3890,8 @@ int input_default_precision ( struct precision * ppr ) {
   /*For energy injection from DM annihilation or decays */
   sprintf(ppr->energy_injec_coeff_file,__CLASSDIR__);
   strcat(ppr->energy_injec_coeff_file,"/DarkAgesModule/GSVI_file.dat"); //Default correspond to the GSVI case
-  // sprintf(ppr->energy_injec_f_eff_file,__CLASSDIR__);
-  // strcat(ppr->energy_injec_f_eff_file,"/DM_Annihilation_files/f_z_withouthalos_electrons_100GeV.dat");
+  sprintf(ppr->energy_injec_f_eff_file,__CLASSDIR__);
+  strcat(ppr->energy_injec_f_eff_file,"EnergyInjection_example_file_type1.dat");
 
   /* BEGIN: Initializing the parameters related to using an external code for the calculation of f(z) */
   ppr->fz_is_extern = _FALSE_;
