@@ -1409,10 +1409,16 @@ int input_read_parameters(
         class_read_double("PBH_ADAF_delta",pth->PBH_ADAF_delta);
         flag2=_TRUE_;
       }
+      /** - Assume L_acc = L_ed */
+      if (strcmp(string1,"Eddington") == 0) {
+        pth->PBH_accretion_recipe=Eddington;
+        class_read_double("PBH_ADAF_delta",pth->PBH_ADAF_delta);
+        flag2=_TRUE_;
+      }
 
     class_test(flag2==_FALSE_,
                  errmsg,
-                 "could not identify PBH_accretion_recipe, check that it is one of 'spherical_accretion' or 'disk_accretion'.");
+                 "could not identify PBH_accretion_recipe, check that it is one of 'spherical_accretion', 'disk_accretion' or 'Eddington'.");
     }
     else{
       class_stop(errmsg,"you have 'PBH_accreting_mass>0. && PBH_fraction>0' and you forgot to give an accretion recipe. Please choose between spherical_accretion and disk_accretion. ")
@@ -1739,7 +1745,7 @@ int input_read_parameters(
               strcat(ppr->command_fz,"/DarkAgesModule/bin/DarkAges --hist=accreting_PBH --mass=");
               sprintf(string2,"%g",pth->PBH_accreting_mass);
               strcat(ppr->command_fz,string2);
-              if(pth->PBH_accretion_recipe==spherical_accretion)
+              if(pth->PBH_accretion_recipe==spherical_accretion || pth->PBH_accretion_recipe==Eddington)
                 strcat(ppr->command_fz," --accretion_recipe=spherical_accretion");
               else if(pth->PBH_accretion_recipe==disk_accretion)
                 strcat(ppr->command_fz," --accretion_recipe=disk_accretion");

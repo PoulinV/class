@@ -58,7 +58,8 @@ enum modelisation_of_SFR {
 };
 enum PBH_accretion_recipe {
   spherical_accretion, /**< Accretion recipe from Ali_Haimoud & Kamionkowski, arXiv:1612.05644 */
-  disk_accretion  /**< ADAF accretion recipe from Xie and Yuan 2012, following Poulin et al 1707.04206 */
+  disk_accretion, /**< ADAF accretion recipe from Xie and Yuan 2012, following Poulin et al 1707.04206 */
+  Eddington       /**< Assume L_acc = Ledd; leads to a signal that is mass independent */
 };
 enum energy_deposition_function {
   No_deposition, /**< No energy deposition is considered. Useful for pedagogic illustration. */

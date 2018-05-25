@@ -2172,9 +2172,14 @@ int thermodynamics_accreting_pbh_energy_injection(
           L_ed = 4*_PI_*_G_*PBH_mass_at_z*M_sun*m_p*1e6/_eV_over_joules_/(_sigma_*_c_);
           L_acc = 1./137*T_s/(m_p)*J*pow(M_b_dot*_c_*_c_,2)/L_ed;
          }
+         else if(preco->PBH_accretion_recipe == Eddington){
+           L_acc = 4*_PI_*_G_*preco->PBH_accreting_mass*M_sun*_c_*(m_p*1e6/_eV_over_joules_/_c_/_c_)/(_sigma_); //in J/s
+           #define _G_ 6.67428e-11             /**< Newton constant in m^3/Kg/s^2 */
+
+         }
 
 
-
+         /* in J/m^3/s */
         *energy_rate =  (rho_cdm_today/(preco->PBH_accreting_mass*M_sun*_c_*_c_))*pow(1+z,3)*L_acc*preco->PBH_fraction;
         // fprintf(stdout, "%e %e %e %e %e %e %e %e %e %e %e %e\n",z, beta_compton_drag, gamma_cooling,lambda,M_b_dot*_c_*_c_/L_ed,T_s*1e6/_eV_over_Kelvin_,T_s*J/m_p/137,v_eff,v_B,v_l,L_acc_2/L_ed,*energy_rate);
         // fprintf(stdout, "%e %e %e %e %e %e %e %e \n",x_e, M_b_dot,lambda,m_dot_2,l2,L_acc_2,*energy_rate,z);
