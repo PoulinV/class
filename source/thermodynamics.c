@@ -2135,7 +2135,10 @@ int thermodynamics_accreting_pbh_energy_injection(
             }
 
             L_acc = epsilon*M_b_dot*_c_*_c_;
-
+            if(L_acc >= L_ed){
+               L_acc = L_ed; //Accretion rate saturates.
+               // printf("%e %e %e\n",z,L_acc,L_ed);
+            }
           }
         /** Spherical accretion from Ali-Haimoud et al. 1612.05644 */
         else if(preco->PBH_accretion_recipe == spherical_accretion){
@@ -2171,11 +2174,14 @@ int thermodynamics_accreting_pbh_energy_injection(
           else J = 4/_PI_*sqrt(2/_PI_)*pow(T_s/m_e,-0.5)*(1+5.5*pow(T_s/m_e,1.25));
           L_ed = 4*_PI_*_G_*PBH_mass_at_z*M_sun*m_p*1e6/_eV_over_joules_/(_sigma_*_c_);
           L_acc = 1./137*T_s/(m_p)*J*pow(M_b_dot*_c_*_c_,2)/L_ed;
+          // printf("%e %e %e\n",z,L_acc,L_ed);
+          if(L_acc >= L_ed){
+             L_acc = L_ed; //Accretion rate saturates.
+             // printf("%e %e %e\n",z,L_acc,L_ed);
+          }
          }
          else if(preco->PBH_accretion_recipe == Eddington){
            L_acc = 4*_PI_*_G_*preco->PBH_accreting_mass*M_sun*_c_*(m_p*1e6/_eV_over_joules_/_c_/_c_)/(_sigma_); //in J/s
-           #define _G_ 6.67428e-11             /**< Newton constant in m^3/Kg/s^2 */
-
          }
 
 
