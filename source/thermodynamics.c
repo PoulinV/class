@@ -1996,7 +1996,7 @@ int thermodynamics_accreting_pbh_energy_injection(
 
   double rho_cdm_today;
   double PBH_mass_at_z,Boost_factor;
-  double tau;
+  double tau,tau_E, Gamma_E;
   int last_index_back;
   double * pvecback;
   //Parameters related to PBH
@@ -2181,7 +2181,18 @@ int thermodynamics_accreting_pbh_energy_injection(
           }
          }
          else if(preco->PBH_accretion_recipe == Eddington){
-           L_acc = 4*_PI_*_G_*preco->PBH_accreting_mass*M_sun*_c_*(m_p*1e6/_eV_over_joules_/_c_/_c_)/(_sigma_); //in J/s
+           L_ed = 4*_PI_*_G_*preco->PBH_accreting_mass*M_sun*_c_*(m_p*1e6/_eV_over_joules_/_c_/_c_)/(_sigma_);//in J/s
+           tau_E = preco->PBH_accreting_mass*M_sun*_c_*_c_/L_ed; //This is PBH-mass independent.
+           epsilon = 0.1;
+           // printf("tau_E %e pvecback[pba->index_bg_time] %e z %e\n", tau_E*(1./9), pvecback[pba->index_bg_time]/(_c_ / _Mpc_over_m_), z);
+           if(preco->PBH_accretion_z_mass_increase > 0 && z > 6){
+             Boost_factor = exp((1-epsilon)/epsilon*(pvecback[pba->index_bg_time]/(_c_ / _Mpc_over_m_))/tau_E);//assume t_i = 0; very good approximation given that t_i is ~ (M/10^5Msun) s.
+           }
+           else{
+             Boost_factor = 1;
+           }
+           // printf("Boost_factor %e z %e\n", Boost_factor,z);
+           L_acc = Boost_factor * L_ed; //in J/s
          }
 
 
@@ -3630,19 +3641,18 @@ int thermodynamics_reionization_sample(
     if(pth->reio_stars_and_dark_matter == _TRUE_){
       /**
        * This small routine compares the reionization table to the recombination one and choose the highest x_e between the two.
-       * This way allows to enables to avoid unphysical discontiniuty in the ionization fraction at low x_e.
+       * This way avoid unphysical discontiniuty in the ionization fraction at low x_e.
        * First, we interpolate the value of x_e at the evaluated redshift from the recombination table. The linear interpolation has been checked
-       * to work well but it could be improve for security. Then we perform the comparison.
+       * to work well but it could be improve for security. Then we perform the comparaison.
        */
 
       x_tmp= (preco->recombination_table[(j-2)*preco->re_size+preco->index_re_xe]-preco->recombination_table[(j-1)*preco->re_size+preco->index_re_xe])/(preco->recombination_table[(j-2)*preco->re_size+preco->index_re_z]
         -preco->recombination_table[(j-1)*preco->re_size+preco->index_re_z])*(z_next-preco->recombination_table[(j-1)*preco->re_size+preco->index_re_z])+
         preco->recombination_table[(j-1)*preco->re_size+preco->index_re_xe]  ;
       x_tmp = MAX(0.,x_tmp); // Small check to avoid negative values of x_e.
-
-      if(x_tmp <1. + 2.*pth->YHe/(_not4_*(1.-pth->YHe))) xe_next=MAX(xe_next,x_tmp); // Here the comparison is made.
-      else x_tmp = 1. + 2.*pth->YHe/(_not4_*(1.-pth->YHe)); // the maximal value that x_e can reach.
-
+      x_tmp = MIN(x_tmp,1. + 2.*pth->YHe/(_not4_*(1.-pth->YHe)));// Avoid too large values of x_e.
+      xe_next=MAX(xe_next,x_tmp); // Here the comparison is made.
+      if(reio_vector[preio->index_re_xe] == 1. + 2.*pth->YHe/(_not4_*(1.-pth->YHe)))xe_next=1. + 2.*pth->YHe/(_not4_*(1.-pth->YHe)); // reio is now complete!! enforcing that it stays so.
     }
 
     class_call(background_tau_of_z(pba,
