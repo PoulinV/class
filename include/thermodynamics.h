@@ -272,6 +272,7 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
 
   double PBH_fraction; /**< fraction of Dark Matter being PBH */
   double PBH_evaporating_mass; /**< mass from the PBH, in case of Dark Matter being low mass PBH */
+  short PBH_with_wimp_halo; /**< modified accretion rate including the formation of a WIMP halo around the PBH */
 
   /** for PBH accretion */
 
@@ -550,10 +551,16 @@ struct recombination {
   double * annihil_z;
   double * annihil_f_eff;
   double * annihil_dd_f_eff;
+  /** A few parameters useful in case of PBH accretion with WIMP halo formation */
+  double * rb_eff_z;
+  double * rb_eff;
+  double * dd_rb_eff;
+  double r_b_eff_enhancement;
 
   double f_eff; /** effective on the spot parameter */
   int annihil_f_eff_num_lines;
-
+  int rb_eff_num_lines;
+  short PBH_with_wimp_halo;
   enum energy_repartition_coefficient energy_repart_coefficient; /**< energy repartition functions */
 
 
@@ -741,6 +748,20 @@ extern "C" {
                                                     double z
                                                   );
   int thermodynamics_annihilation_f_eff_free(
+                                                  struct recombination * preco
+                                                );
+  int thermodynamics_effective_bondi_radius_init(
+                                                   struct precision * ppr,
+                                                   struct background * pba,
+                                                   struct recombination * preco
+                                                 );
+  int thermodynamics_effective_bondi_radius_interpolate(
+                                                    struct precision * ppr,
+                                                    struct background * pba,
+                                                    struct recombination * preco,
+                                                    double z
+                                                  );
+  int thermodynamics_effective_bondi_radius_free(
                                                   struct recombination * preco
                                                 );
   int thermodynamics_onthespot_energy_injection(

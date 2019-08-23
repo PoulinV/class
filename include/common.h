@@ -430,6 +430,7 @@ struct precision
 
   FileName energy_injec_coeff_file;
   FileName energy_injec_f_eff_file;
+  FileName effective_bondi_radius_file;
 
 /* @endcond */
 
