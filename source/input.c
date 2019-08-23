@@ -813,7 +813,7 @@ int input_read_parameters(
     // fprintf(stdout, "you have chosen Gamma = %e km/s/Mpc, tau = %e s \n",pba->Gamma_dcdm/(1.e3 / _c_),pba->tau_dcdm);
   }
   if (flag2 == _TRUE_){
-  pba->Gamma_dcdm = 1/(param2/(1e9*365*24*3600))/1.02e-3*(1.e3 / _c_); //1 km s -1Mpc- 1 = 1.02* 10^- 3Gyr -1
+  pba->Gamma_dcdm = 1/(param2/(1e9*365*24*3600))/1.02e-3*(1.e3 / _c_);
   pba->tau_dcdm = param2;
   }
 
@@ -1416,12 +1416,33 @@ int input_read_parameters(
         flag2=_TRUE_;
       }
 
+
     class_test(flag2==_FALSE_,
                  errmsg,
                  "could not identify PBH_accretion_recipe, check that it is one of 'spherical_accretion', 'disk_accretion' or 'Eddington'.");
     }
     else{
       class_stop(errmsg,"you have 'PBH_accreting_mass>0. && PBH_fraction>0' and you forgot to give an accretion recipe. Please choose between spherical_accretion and disk_accretion. ")
+    }
+    class_call(parser_read_string(pfc,"PBH_with_wimp_halo",&string1,&flag1,errmsg),
+               errmsg,
+               errmsg);
+   if (flag1 == _TRUE_) {
+     if ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)) {
+       pth->PBH_with_wimp_halo = _TRUE_;
+       class_read_string("effective_bondi_radius_file",ppr->effective_bondi_radius_file);
+     }
+     else {
+       if ((strstr(string1,"n") != NULL) || (strstr(string1,"N") != NULL)) {
+         pth->PBH_with_wimp_halo = _FALSE_;
+       }
+       else {
+         class_stop(errmsg,"incomprehensible input '%s' for the field 'PBH_with_wimp_halo'",string1);
+       }
+     }
+   }
+    else{
+        pth->PBH_with_wimp_halo = _FALSE_;
     }
     class_read_double("PBH_accretion_eigenvalue",pth->PBH_accretion_eigenvalue); // If chosen to negative value, it will be set to the linear result.
     class_read_double("PBH_relative_velocities",pth->PBH_relative_velocities);
@@ -1430,7 +1451,7 @@ int input_read_parameters(
     class_read_double("PBH_accretion_width_mass_increase",pth->PBH_accretion_width_mass_increase);
 
   }
-  class_test(pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,errmsg,
+  class_test(pth->PBH_evaporating_mass > 0 && pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,errmsg,
     "The value of 'pth->PBH_fraction' that you enter is suspicious given the mass you chose. You are several orders of magnitude above the limit. The code doesn't handle well too high energy injection. Please choose 'pth->PBH_fraction < 1e-4'. ")
   class_test(pth->PBH_accreting_mass<0.,errmsg,
     "You need to enter a mass for your PBH 'PBH_accreting_mass > 0.' (in Msun).");
@@ -3617,6 +3638,7 @@ int input_default_params(
   pth->PBH_accretion_width_mass_increase = 0; //no mass increase in the standard computation
   pth->energy_repart_coefficient = GSVI;
   pth->Lambda_over_theoritical_Lambda = 1.;
+  pth->PBH_with_wimp_halo = _FALSE_;
 
   /** Tables specific to evaporating PBH */
   pth->PBH_table_is_initialized = _FALSE_ ;
@@ -3897,7 +3919,10 @@ int input_default_precision ( struct precision * ppr ) {
   sprintf(ppr->energy_injec_coeff_file,__CLASSDIR__);
   strcat(ppr->energy_injec_coeff_file,"/DarkAgesModule/GSVI_file.dat"); //Default correspond to the GSVI case
   sprintf(ppr->energy_injec_f_eff_file,__CLASSDIR__);
-  strcat(ppr->energy_injec_f_eff_file,"EnergyInjection_example_file_type1.dat");
+  strcat(ppr->energy_injec_f_eff_file,"/EnergyInjection_example_file_type1.dat");
+
+  sprintf(ppr->effective_bondi_radius_file,__CLASSDIR__);
+  strcat(ppr->effective_bondi_radius_file,"/effective_bondi_radius.dat");
 
   /* BEGIN: Initializing the parameters related to using an external code for the calculation of f(z) */
   ppr->fz_is_extern = _FALSE_;

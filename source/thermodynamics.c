@@ -341,6 +341,14 @@ int thermodynamics_init(
                  preco->error_message,
                  preco->error_message);
     }
+    if(pth->PBH_with_wimp_halo==_TRUE_){
+      class_call(thermodynamics_effective_bondi_radius_init(ppr,pba,preco),
+                 preco->error_message,
+                 preco->error_message);
+    }
+
+
+
   }
 
   /** - check energy injection parameters */
@@ -1650,6 +1658,120 @@ int thermodynamics_annihilation_f_eff_init(
   return _SUCCESS_;
 
 }
+int thermodynamics_effective_bondi_radius_init(
+                                                  struct precision * ppr,
+                                                  struct background * pba,
+                                                  struct recombination * preco
+                                                  ) {
+
+  FILE * fA;
+  char line[_LINE_LENGTH_MAX_];
+  char * left;
+
+  int num_lines=0;
+  int array_line=0;
+
+  /*
+
+      the following file is assumed to contain (apart from comments and blank lines):
+     - One number (num_lines) = number of lines of the file
+     - One column (z , f(z)) where f(z) represents the "effective" fraction of energy deposited into the medium at redshift z, in presence of halo formation.
+
+  */
+  class_open(fA,ppr->effective_bondi_radius_file, "r",preco->error_message);
+
+  /* go through each line */
+  while (fgets(line,_LINE_LENGTH_MAX_-1,fA) != NULL) {
+
+    /* eliminate blank spaces at beginning of line */
+    left=line;
+    while (left[0]==' ') {
+      left++;
+    }
+
+    /* check that the line is neither blank nor a comment. In
+       ASCII, left[0]>39 means that first non-blank charachter might
+       be the beginning of some data (it is not a newline, a #, a %,
+       etc.) */
+    if (left[0] > 39) {
+
+      /* if the line contains data, we must interprete it. If
+         num_lines == 0 , the current line must contain
+         its value. Otherwise, it must contain (xe , chi_heat, chi_Lya, chi_H, chi_He, chi_lowE). */
+      if (num_lines == 0) {
+
+        /* read num_lines, infer size of arrays and allocate them */
+        class_test(sscanf(line,"%d",&num_lines) != 1,
+                   preco->error_message,
+                   "could not read value of parameters num_lines in file %s\n",ppr->effective_bondi_radius_file);
+        class_alloc(preco->rb_eff_z,num_lines*sizeof(double),preco->error_message);
+        class_alloc(preco->rb_eff,num_lines*sizeof(double),preco->error_message);
+
+        class_alloc(preco->dd_rb_eff,num_lines*sizeof(double),preco->error_message);
+
+        preco->rb_eff_num_lines = num_lines;
+
+
+        array_line=0;
+
+      }
+      else {
+
+        /* read coefficients */
+        class_test(sscanf(line,"%lg %lg",
+                          &(preco->rb_eff_z[array_line]),
+                          &(preco->rb_eff[array_line]))!= 2,
+                   preco->error_message,
+                   "could not read value of parameters coefficients in file %s\n",ppr->effective_bondi_radius_file);
+        array_line ++;
+      }
+    }
+  }
+
+  fclose(fA);
+
+  /* spline in one dimension */
+  class_call(array_spline_table_lines(preco->rb_eff_z,
+                                      num_lines,
+                                      preco->rb_eff,
+                                      1,
+                                      preco->dd_rb_eff,
+                                      _SPLINE_NATURAL_,
+                                      preco->error_message),
+             preco->error_message,
+             preco->error_message);
+
+
+  return _SUCCESS_;
+
+}
+
+
+int thermodynamics_effective_bondi_radius_interpolate(
+                                                  struct precision * ppr,
+                                                  struct background * pba,
+                                                  struct recombination * preco,
+                                                  double z
+                                                ){
+
+  int last_index;
+  class_call(array_interpolate_spline(preco->rb_eff_z,
+                                      preco->rb_eff_num_lines,
+                                      preco->rb_eff,
+                                      preco->dd_rb_eff,
+                                      1,
+                                      z,
+                                      &last_index,
+                                      &(preco->r_b_eff_enhancement),
+                                      1,
+                                      preco->error_message),
+             preco->error_message,
+             preco->error_message);
+
+
+  return _SUCCESS_;
+
+}
 
 
 int thermodynamics_annihilation_f_eff_interpolate(
@@ -1686,6 +1808,19 @@ int thermodynamics_annihilation_f_eff_free(
   free(preco->annihil_z);
   free(preco->annihil_f_eff);
   free(preco->annihil_dd_f_eff);
+
+
+  return _SUCCESS_;
+
+}
+
+int thermodynamics_effective_bondi_radius_free(
+                                                  struct recombination * preco
+                                                  ) {
+
+  free(preco->rb_eff_z);
+  free(preco->rb_eff);
+  free(preco->dd_rb_eff);
 
 
   return _SUCCESS_;
@@ -2053,10 +2188,12 @@ int thermodynamics_accreting_pbh_energy_injection(
             M_ed_dot= 10*L_ed/(_c_*_c_);
             M_crit = 0.01*M_ed_dot;
             v_B = sqrt((1+x_e)*T_infinity/m_p)*_c_;
-            if(preco->PBH_relative_velocities < 0.){
+            if(preco->PBH_relative_velocities < 0. && preco->PBH_relative_velocities > -10){
               v_l = 30*MIN(1,z/1000)*1e3; // in m/s.
               if(v_B < v_l) v_eff = sqrt(v_B*v_l);
               else v_eff = v_B;
+            }if(preco->PBH_relative_velocities < 10){
+              v_eff = v_B;
             }
             else{
               v_l = preco->PBH_relative_velocities*1e3; // converted to m/s.
@@ -2065,7 +2202,15 @@ int thermodynamics_accreting_pbh_energy_injection(
 
             lambda = preco->PBH_accretion_eigenvalue;
             rho = pvecback[pba->index_bg_rho_b]/pow(_Mpc_over_m_,2)*3/8./_PI_/_G_*_c_*_c_; /* energy density in kg/m^3 */
-            M_b_dot = 4*_PI_*lambda*pow(_G_*PBH_mass_at_z*M_sun,2)*rho*pow(v_eff,-3.);
+            r_B = _G_*PBH_mass_at_z*M_sun*pow(v_eff,-2); // in m
+            if(preco->PBH_with_wimp_halo == _TRUE_){
+              class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,z),
+                        preco->error_message,
+                        preco->error_message);
+              preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,0.);
+              r_B *= preco->r_b_eff_enhancement;
+            }
+            M_b_dot = 4*_PI_*lambda*rho*r_B*r_B*v_eff; //in kg s^-1
             if(preco->PBH_ADAF_delta == 1e-3){
               Value_min = 7.6e-5;
               Value_med = 4.5e-3;
@@ -2146,17 +2291,37 @@ int thermodynamics_accreting_pbh_energy_injection(
           // x_e_infinity = 1; // change to 1 for the strong-feedback case
           x_e_infinity = x_e; // change to x_e for the no-feedback case
           v_B = sqrt((1+x_e_infinity)*T_infinity/m_p)*_c_; //sound speed.
-          if(preco->PBH_relative_velocities < 0.){
+          if(preco->PBH_relative_velocities < 0. && preco->PBH_relative_velocities > -10){
             v_l = 30*MIN(1,z/1000)*1e3; // in m/s.
             if(v_B < v_l) v_eff = sqrt(v_B*v_l);
             else v_eff = v_B;
+          }if(preco->PBH_relative_velocities < 10){
+            v_eff = v_B;
           }
           else{
             v_l = preco->PBH_relative_velocities*1e3; // converted to m/s.
             v_eff = pow(v_l*v_l+v_B*v_B,0.5);
           }
           r_B = _G_*PBH_mass_at_z*M_sun*pow(v_eff,-2); // in m
-          t_B = _G_*PBH_mass_at_z*M_sun/pow(v_eff,3); // in s
+          if(preco->PBH_with_wimp_halo == _TRUE_){
+            class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,z),
+                      preco->error_message,
+                      preco->error_message);
+            if(z>1000){
+              class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,999),
+                        preco->error_message,
+                        preco->error_message);
+            }
+            if(z<100){
+              class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,99),
+                        preco->error_message,
+                        preco->error_message);
+            }
+            preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,0.);
+            // printf("%e %e\n",z,preco->r_b_eff_enhancement);
+            r_B *= preco->r_b_eff_enhancement;
+          }
+          t_B = r_B / v_eff;// in s
           beta_compton_drag = 4./3*x_e_infinity*_sigma_*rho_cmb*t_B/(m_p)*_c_;
           gamma_cooling = 2*m_p/(m_e*(1+x_e_infinity))*beta_compton_drag;
           lambda_iso = 0.25*exp(1.5);
@@ -4478,6 +4643,7 @@ int fill_recombination_structure(struct precision * ppr,
   preco->has_on_the_spot = pth->has_on_the_spot;
   preco->decay_fraction = pth->decay_fraction;
   preco->PBH_accreting_mass = pth->PBH_accreting_mass;
+  preco->PBH_with_wimp_halo = pth->PBH_with_wimp_halo;
   preco->PBH_ADAF_delta = pth->PBH_ADAF_delta;
   preco->PBH_accretion_eigenvalue = pth->PBH_accretion_eigenvalue;
   preco->PBH_relative_velocities = pth->PBH_relative_velocities;
@@ -5384,6 +5550,9 @@ int thermodynamics_merge_reco_and_reio(
     }
     if(pth->energy_repart_coefficient == GSVI || pth->energy_repart_coefficient==no_factorization || pth->energy_repart_coefficient ==chi_from_file){
       thermodynamics_annihilation_coefficients_free(pth);
+    }
+    if(pth->PBH_with_wimp_halo == _TRUE_){
+      thermodynamics_effective_bondi_radius_free(preco);
     }
   }
   if ((pth->reio_parametrization != reio_none))
