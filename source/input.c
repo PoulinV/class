@@ -3922,7 +3922,7 @@ int input_default_precision ( struct precision * ppr ) {
   strcat(ppr->energy_injec_f_eff_file,"/EnergyInjection_example_file_type1.dat");
 
   sprintf(ppr->effective_bondi_radius_file,__CLASSDIR__);
-  strcat(ppr->effective_bondi_radius_file,"/effective_bondi_radius.dat");
+  strcat(ppr->effective_bondi_radius_file,"/effective_bondi_radii/effective_bondi_radius_m1e4.dat");
 
   /* BEGIN: Initializing the parameters related to using an external code for the calculation of f(z) */
   ppr->fz_is_extern = _FALSE_;

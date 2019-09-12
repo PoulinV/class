@@ -2192,7 +2192,7 @@ int thermodynamics_accreting_pbh_energy_injection(
               v_l = 30*MIN(1,z/1000)*1e3; // in m/s.
               if(v_B < v_l) v_eff = sqrt(v_B*v_l);
               else v_eff = v_B;
-            }if(preco->PBH_relative_velocities < 10){
+            }else if(preco->PBH_relative_velocities < 10){
               v_eff = v_B;
             }
             else{
@@ -2293,9 +2293,11 @@ int thermodynamics_accreting_pbh_energy_injection(
           v_B = sqrt((1+x_e_infinity)*T_infinity/m_p)*_c_; //sound speed.
           if(preco->PBH_relative_velocities < 0. && preco->PBH_relative_velocities > -10){
             v_l = 30*MIN(1,z/1000)*1e3; // in m/s.
-            if(v_B < v_l) v_eff = sqrt(v_B*v_l);
+            if(v_B < v_l){
+              v_eff = sqrt(v_B*v_l);
+            }
             else v_eff = v_B;
-          }if(preco->PBH_relative_velocities < 10){
+          }else if(preco->PBH_relative_velocities < 10){
             v_eff = v_B;
           }
           else{
@@ -2303,6 +2305,7 @@ int thermodynamics_accreting_pbh_energy_injection(
             v_eff = pow(v_l*v_l+v_B*v_B,0.5);
           }
           r_B = _G_*PBH_mass_at_z*M_sun*pow(v_eff,-2); // in m
+          // printf("PBH_mass_at_z %e\n",PBH_mass_at_z);
           if(preco->PBH_with_wimp_halo == _TRUE_){
             class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,z),
                       preco->error_message,
@@ -2321,6 +2324,7 @@ int thermodynamics_accreting_pbh_energy_injection(
             // printf("%e %e\n",z,preco->r_b_eff_enhancement);
             r_B *= preco->r_b_eff_enhancement;
           }
+          // printf("v_eff %e v_B %e vL %e \n",v_eff,v_B, 30*MIN(1,z/1000)*1e3);
           t_B = r_B / v_eff;// in s
           beta_compton_drag = 4./3*x_e_infinity*_sigma_*rho_cmb*t_B/(m_p)*_c_;
           gamma_cooling = 2*m_p/(m_e*(1+x_e_infinity))*beta_compton_drag;
