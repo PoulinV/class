@@ -3984,9 +3984,14 @@ int thermodynamics_reionization_sample(
             /** - --> derivative of baryon temperature */
               preco->xe_tmp=preio->reionization_table[i*preio->re_size+preio->index_re_xe];
               preco->Tm_tmp=preio->reionization_table[i*preio->re_size+preio->index_re_Tb];
-              class_call(thermodynamics_energy_injection(ppr,pba,preco,z,&energy_rate,pth->error_message),
-                         pth->error_message,
-                         pth->error_message);
+              if(z>pth->switch_off_injection_at_z){
+                class_call(thermodynamics_energy_injection(ppr,pba,preco,z,&energy_rate,pth->error_message),
+                           pth->error_message,
+                           pth->error_message);
+              }
+              else{
+                energy_rate = 0;
+              }
 
               preco->z_tmp=z;
                /* coefficient as revised by Galli et al. 2013 (in fact it is an interpolation by Vivian Poulin of columns 1 and 2 in Table V of Slatyer et al. 2013) */
@@ -5186,7 +5191,7 @@ int thermodynamics_derivs_with_recfast(
      preco->xe_tmp=x;
      preco->Tm_tmp=Tmat;
 
-        if( z > 2){//sometimes problem with interpolation
+        if( z > pth->switch_off_injection_at_z){//switch_off_injection_at_z default =2 because sometimes problem with interpolation
           // fprintf(stdout, "z %e,Tmat %e, x %e\n",z,Tmat,x);
         class_call(thermodynamics_energy_injection(ppr,pba,preco,z,&energy_rate,error_message),
                    error_message,

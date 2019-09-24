@@ -227,6 +227,7 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
   * For DM annihilation & decay.
   * Note that the DM lifetime is defined in the background module
   */
+  double switch_off_injection_at_z; /** z below which energy injection is switched off. default = 2. */
   double annihilation; /** parameter describing CDM annihilation (f <sigma*v> / m_cdm, see e.g. 0905.0003) */
   double annihilation_cross_section;
   double DM_mass;

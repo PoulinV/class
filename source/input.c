@@ -1376,7 +1376,7 @@ int input_read_parameters(
 
   /** - Reading energy injection parameters from CDM annihilation/decay && PBH evaporation/accretion */
   /** - This includes many tests to make sure the user is giving meaningful commands */
-
+  class_read_double("switch_off_injection_at_z",pth->switch_off_injection_at_z);
   class_read_double("annihilation",pth->annihilation);
   class_read_double("annihilation_cross_section",pth->annihilation_cross_section);
   class_read_double("DM_mass",pth->DM_mass);
@@ -3623,6 +3623,7 @@ int input_default_params(
   pth->cp = 2.59;
   pth->dp = 5.68;
   pth->z_start_reio_stars = 15;
+  pth->switch_off_injection_at_z = 2; //defaut: 2, sometimes probleme with interpolation.
   pth->annihilation = 0.;
   pth->annihilation_cross_section = 0.;
   pth->f_eff = 0;
@@ -3922,7 +3923,7 @@ int input_default_precision ( struct precision * ppr ) {
   strcat(ppr->energy_injec_f_eff_file,"/EnergyInjection_example_file_type1.dat");
 
   sprintf(ppr->effective_bondi_radius_file,__CLASSDIR__);
-  strcat(ppr->effective_bondi_radius_file,"/effective_bondi_radii/effective_bondi_radius_m1e4.dat");
+  strcat(ppr->effective_bondi_radius_file,"/effective_bondi_radii/csvrel/effective_bondi_radius_m1e4.dat");
 
   /* BEGIN: Initializing the parameters related to using an external code for the calculation of f(z) */
   ppr->fz_is_extern = _FALSE_;
