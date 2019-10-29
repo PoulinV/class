@@ -341,7 +341,8 @@ int thermodynamics_init(
                  preco->error_message,
                  preco->error_message);
     }
-    if(pth->PBH_with_wimp_halo==_TRUE_){
+
+    if(pth->PBH_with_wimp_halo == numerical_halo){
       class_call(thermodynamics_effective_bondi_radius_init(ppr,pba,preco),
                  preco->error_message,
                  preco->error_message);
@@ -1094,6 +1095,8 @@ int thermodynamics_indices(
     index+= preio->reio_num_z;
     preio->index_reio_first_xe = index;
     index+= preio->reio_num_z;
+
+    preio->reio_num_params = index;
 
   }
 
@@ -2142,6 +2145,8 @@ int thermodynamics_accreting_pbh_energy_injection(
   double Value_min, Value_med, Value_max, a=0, epsilon_0=0.1;
   rho_cdm_today = pow(pba->H0*_c_/_Mpc_over_m_,2)*3/8./_PI_/_G_*(pba->Omega0_cdm)*_c_*_c_; /* energy density in J/m^3 */
   double width,boost_before,boost_after;
+  double p, mHalo, rHalo, r_BH,ratio;
+
   class_alloc(pvecback,pba->bg_size*sizeof(double),pba->error_message);
   class_call(background_tau_of_z(pba,
                                  z,
@@ -2203,11 +2208,34 @@ int thermodynamics_accreting_pbh_energy_injection(
             lambda = preco->PBH_accretion_eigenvalue;
             rho = pvecback[pba->index_bg_rho_b]/pow(_Mpc_over_m_,2)*3/8./_PI_/_G_*_c_*_c_; /* energy density in kg/m^3 */
             r_B = _G_*PBH_mass_at_z*M_sun*pow(v_eff,-2); // in m
-            if(preco->PBH_with_wimp_halo == _TRUE_){
+            if(preco->PBH_with_wimp_halo == numerical_halo){
               class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,z),
                         preco->error_message,
                         preco->error_message);
+              if(z>1000){
+                class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,999),
+                          preco->error_message,
+                          preco->error_message);
+              }
+              if(z<100){
+                class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,99),
+                          preco->error_message,
+                          preco->error_message);
+              }
               preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,0.);
+              // printf("%e %e\n",z,preco->r_b_eff_enhancement);
+              r_B *= preco->r_b_eff_enhancement;
+            }else if(preco->PBH_with_wimp_halo == analytical_halo){
+              p = 0.75;
+              mHalo = 3000 * PBH_mass_at_z / (1+z);
+              rHalo = 19 * _Mpc_over_m_ / 1e6 / (1+z) * pow(mHalo,1./3.); //_Mpc_over_m_ / 1e6 converts from pc to meters.
+              r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
+              if (rHalo < r_B){
+                preco->r_b_eff_enhancement = r_BH/r_B;
+              }else{
+                preco->r_b_eff_enhancement = r_BH*pow(r_BH/rHalo,p/(1-p))*pow(1/(1-p),1/(1-p));
+              }
+              printf("preco->r_b_eff_enhancement %e z %e\n",preco->r_b_eff_enhancement,z);
               r_B *= preco->r_b_eff_enhancement;
             }
             M_b_dot = 4*_PI_*lambda*rho*r_B*r_B*v_eff; //in kg s^-1
@@ -2306,7 +2334,7 @@ int thermodynamics_accreting_pbh_energy_injection(
           }
           r_B = _G_*PBH_mass_at_z*M_sun*pow(v_eff,-2); // in m
           // printf("PBH_mass_at_z %e\n",PBH_mass_at_z);
-          if(preco->PBH_with_wimp_halo == _TRUE_){
+          if(preco->PBH_with_wimp_halo == numerical_halo){
             class_call(thermodynamics_effective_bondi_radius_interpolate(ppr,pba,preco,z),
                       preco->error_message,
                       preco->error_message);
@@ -2323,6 +2351,23 @@ int thermodynamics_accreting_pbh_energy_injection(
             preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,0.);
             // printf("%e %e\n",z,preco->r_b_eff_enhancement);
             r_B *= preco->r_b_eff_enhancement;
+          }else if(preco->PBH_with_wimp_halo == analytical_halo){
+            p = 0.75;
+            mHalo = 3000 * PBH_mass_at_z / (1+z);
+            rHalo = 19 * _Mpc_over_m_ / 1e6 / (1+z) * pow(mHalo,1./3.); //_Mpc_over_m_ / 1e6 converts from pc to meters.
+            r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
+            if (rHalo < r_BH){
+              preco->r_b_eff_enhancement = r_BH/r_B;
+            }else{
+              preco->r_b_eff_enhancement = r_BH/r_B*pow(r_BH/rHalo,p/(1-p))*pow(1/(1-p),1/(1-p));
+            }
+            if(preco->r_b_eff_enhancement<1)printf("warning: preco->r_b_eff_enhancement %e < 1 at z %e\n",preco->r_b_eff_enhancement,z);
+            // printf("r_BH/rHalo %e preco->r_b_eff_enhancement %e z %e\n",r_BH/rHalo,preco->r_b_eff_enhancement,z);
+            r_B = r_B*preco->r_b_eff_enhancement;
+            if(r_B/v_eff*pvecback[pba->index_bg_H]*(_c_ / _Mpc_over_m_) > 1){
+              if(pba->background_verbose > 5)printf("warning: the stationary hypothesis is not valid for Mpbh = %e Msun,i.e., rB*H/veff = %e > 1 at z = %e\n", PBH_mass_at_z, r_B/v_eff*pvecback[pba->index_bg_H]*(_c_ / _Mpc_over_m_),z);
+              r_B = r_B/preco->r_b_eff_enhancement;
+            }
           }
           // printf("v_eff %e v_B %e vL %e \n",v_eff,v_B, 30*MIN(1,z/1000)*1e3);
           t_B = r_B / v_eff;// in s
@@ -5560,7 +5605,7 @@ int thermodynamics_merge_reco_and_reio(
     if(pth->energy_repart_coefficient == GSVI || pth->energy_repart_coefficient==no_factorization || pth->energy_repart_coefficient ==chi_from_file){
       thermodynamics_annihilation_coefficients_free(pth);
     }
-    if(pth->PBH_with_wimp_halo == _TRUE_){
+    if(pth->PBH_with_wimp_halo == numerical_halo){
       thermodynamics_effective_bondi_radius_free(preco);
     }
   }

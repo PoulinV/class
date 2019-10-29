@@ -1424,26 +1424,31 @@ int input_read_parameters(
     else{
       class_stop(errmsg,"you have 'PBH_accreting_mass>0. && PBH_fraction>0' and you forgot to give an accretion recipe. Please choose between spherical_accretion and disk_accretion. ")
     }
+
     class_call(parser_read_string(pfc,"PBH_with_wimp_halo",&string1,&flag1,errmsg),
                errmsg,
                errmsg);
-   if (flag1 == _TRUE_) {
-     if ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL)) {
-       pth->PBH_with_wimp_halo = _TRUE_;
-       class_read_string("effective_bondi_radius_file",ppr->effective_bondi_radius_file);
-     }
-     else {
-       if ((strstr(string1,"n") != NULL) || (strstr(string1,"N") != NULL)) {
-         pth->PBH_with_wimp_halo = _FALSE_;
+     if (flag1 == _TRUE_) {
+
+       if ((strstr(string1,"analytical") != NULL) || (strstr(string1,"Analytical") != NULL)) {
+         pth->PBH_with_wimp_halo = analytical_halo;
+         flag2 = _TRUE_;
        }
-       else {
-         class_stop(errmsg,"incomprehensible input '%s' for the field 'PBH_with_wimp_halo'",string1);
+
+       else if ((strstr(string1,"numerical") != NULL) || (strstr(string1,"Numerical") != NULL)) {
+         pth->PBH_with_wimp_halo = numerical_halo;
+         flag2 = _TRUE_;
        }
+       else if ((strstr(string1,"none") != NULL) || (strstr(string1,"None") != NULL)) {
+         pth->PBH_with_wimp_halo = wimp_halo_none;
+         flag2 = _TRUE_;
+       }
+
+       class_test(flag2==_FALSE_,
+                    errmsg,
+                    "could not identify PBH_with_wimp_halo, check that it is one of 'analytical', 'numerical' or 'wimp_halo_none'.");
+
      }
-   }
-    else{
-        pth->PBH_with_wimp_halo = _FALSE_;
-    }
     class_read_double("PBH_accretion_eigenvalue",pth->PBH_accretion_eigenvalue); // If chosen to negative value, it will be set to the linear result.
     class_read_double("PBH_relative_velocities",pth->PBH_relative_velocities);
     class_read_double("PBH_accretion_final_mass",pth->PBH_accretion_final_mass);
@@ -1705,7 +1710,7 @@ int input_read_parameters(
         if (strcmp(string1,"built_in") == 0) {
           flag2=_TRUE_;
           sprintf(ppr->command_fz,""); //Start by reseting previous command, useful in context of MCMC with MontePython.
-          strcat(ppr->command_fz, "python ");
+          strcat(ppr->command_fz, "python2 ");
           strcat(ppr->command_fz,__CLASSDIR__);
 
             /* Check first if injection history is standard and already implemented */
@@ -3639,7 +3644,7 @@ int input_default_params(
   pth->PBH_accretion_width_mass_increase = 0; //no mass increase in the standard computation
   pth->energy_repart_coefficient = GSVI;
   pth->Lambda_over_theoritical_Lambda = 1.;
-  pth->PBH_with_wimp_halo = _FALSE_;
+  pth->PBH_with_wimp_halo = wimp_halo_none;
 
   /** Tables specific to evaporating PBH */
   pth->PBH_table_is_initialized = _FALSE_ ;

@@ -17,6 +17,15 @@ enum recombination_algorithm {
   hyrec,
   cosmorec
 };
+/**
+ * List of possible recipe for PBH accretion with dark halo.
+ */
+
+enum PBH_with_wimp_halo_models{
+  wimp_halo_none,
+  analytical_halo,
+  numerical_halo
+};
 
 /**
  * List of possible reionization schemes.
@@ -112,6 +121,8 @@ struct thermo
   enum heating_by_stars_parametrization star_heating_parametrization; /**< star heating parametrization */
 
   enum modelisation_of_SFR model_SFR; /**< choice of SFR modelling. Currently Roberston et al 15: bestfit, m1sig, p1sig. */
+
+  enum PBH_with_wimp_halo_models PBH_with_wimp_halo; /**< choice of modeling of the modified accretion rate including the formation of a WIMP halo around the PBH */
 
   double tau_reio; /**< if above set to tau, input value of reionization optical depth */
 
@@ -273,7 +284,7 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
 
   double PBH_fraction; /**< fraction of Dark Matter being PBH */
   double PBH_evaporating_mass; /**< mass from the PBH, in case of Dark Matter being low mass PBH */
-  short PBH_with_wimp_halo; /**< modified accretion rate including the formation of a WIMP halo around the PBH */
+  // short PBH_with_wimp_halo; /**< modified accretion rate including the formation of a WIMP halo around the PBH */
 
   /** for PBH accretion */
 
@@ -513,6 +524,7 @@ struct recombination {
   double * PBH_table_mass_dd; /**< Array of the second derivative of PBH-mass w.r.t. the redshift */
   double * PBH_table_F; /**< Array of F(z)  given the redshift in 'PBH_table_z' */
   double * PBH_table_F_dd; /**< Array of the second derivative of F(z) w.r.t. the redshift */
+  enum PBH_with_wimp_halo_models PBH_with_wimp_halo; /**< choice of modeling of the modified accretion rate including the formation of a WIMP halo around the PBH */
 
   double PBH_evaporating_mass; /**< initial mass from the PBH, in case of Dark Matter being low mass PBH */
   double PBH_fraction; /**< fraction of Dark Matter being PBH */
@@ -561,7 +573,7 @@ struct recombination {
   double f_eff; /** effective on the spot parameter */
   int annihil_f_eff_num_lines;
   int rb_eff_num_lines;
-  short PBH_with_wimp_halo;
+  // short PBH_with_wimp_halo;
   enum energy_repartition_coefficient energy_repart_coefficient; /**< energy repartition functions */
 
 
