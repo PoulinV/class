@@ -1454,6 +1454,19 @@ int input_read_parameters(
     class_read_double("PBH_accretion_final_mass",pth->PBH_accretion_final_mass);
     class_read_double("PBH_accretion_z_mass_increase",pth->PBH_accretion_z_mass_increase);
     class_read_double("PBH_accretion_width_mass_increase",pth->PBH_accretion_width_mass_increase);
+    class_read_double("PBH_halo_profile_parameter",pth->PBH_halo_profile_parameter);
+
+    class_call(parser_read_string(pfc,"PBH_stationarity_security",&string1,&flag1,errmsg),
+               errmsg,
+               errmsg);
+
+    if ((flag1 == _TRUE_) && ((strstr(string1,"y") != NULL) || (strstr(string1,"Y") != NULL))) {
+
+      pth->PBH_stationarity_security = _TRUE_;
+
+    }
+
+
 
   }
   class_test(pth->PBH_evaporating_mass > 0 && pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,errmsg,
@@ -3642,10 +3655,11 @@ int input_default_params(
   pth->PBH_accretion_final_mass = 0;
   pth->PBH_accretion_z_mass_increase = 0; //no mass increase in the standard computation
   pth->PBH_accretion_width_mass_increase = 0; //no mass increase in the standard computation
+  pth->PBH_halo_profile_parameter = 0.75; //profile is proportional to r^(3-parameter). 0.75 represents bertschinger's seminal result.
   pth->energy_repart_coefficient = GSVI;
   pth->Lambda_over_theoritical_Lambda = 1.;
   pth->PBH_with_wimp_halo = wimp_halo_none;
-
+  pth->PBH_stationarity_security = _FALSE_;
   /** Tables specific to evaporating PBH */
   pth->PBH_table_is_initialized = _FALSE_ ;
   pth->PBH_table_z = NULL;

@@ -122,7 +122,6 @@ struct thermo
 
   enum modelisation_of_SFR model_SFR; /**< choice of SFR modelling. Currently Roberston et al 15: bestfit, m1sig, p1sig. */
 
-  enum PBH_with_wimp_halo_models PBH_with_wimp_halo; /**< choice of modeling of the modified accretion rate including the formation of a WIMP halo around the PBH */
 
   double tau_reio; /**< if above set to tau, input value of reionization optical depth */
 
@@ -284,7 +283,7 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
 
   double PBH_fraction; /**< fraction of Dark Matter being PBH */
   double PBH_evaporating_mass; /**< mass from the PBH, in case of Dark Matter being low mass PBH */
-  // short PBH_with_wimp_halo; /**< modified accretion rate including the formation of a WIMP halo around the PBH */
+  enum PBH_with_wimp_halo_models PBH_with_wimp_halo; /**< choice of modeling of the modified accretion rate including the formation of a WIMP halo around the PBH */
 
   /** for PBH accretion */
 
@@ -300,6 +299,8 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
   double PBH_ADAF_delta; /**<Specific to ADAF_Simulation accretion recipe. Determines the heating of the electrons in the disk, influencing the emissivity. Can be set to 0.5 (aggressive scenario) or 1e-3 (conservative). From Fie and Yuan 2012. */
   double PBH_accretion_eigenvalue; /**< The eigenvalue of the accretion rate. It rescales the perfect Bondi case. (see e.g. Ali-Haimoud & Kamionkowski 2016) */
   double PBH_relative_velocities; /**< The relative velocities between PBH and baryons in km/s. If negative, the linear result is chosen by the code. */
+  double PBH_halo_profile_parameter; /**< //profile is proportional to r^(3-parameter). 0.75 represents bertschinger's seminal result. */
+  short PBH_stationarity_security;  /** Enforce Lacc=Led if stationarity hypothesis is violated */
 
   /** @name - all indices for the vector of thermodynamical (=th) quantities stored in table */
 
@@ -514,6 +515,7 @@ struct recombination {
   double PBH_ADAF_delta; /**<Specific to ADAF_Simulation accretion recipe. Determines the heating of the electrons in the disk, influencing the emissivity. Can be set to 0.5 (aggressive scenario) or 1e-3 (conservative). From Fie and Yuan 2012. */
   double PBH_accretion_eigenvalue; /**< The eigenvalue of the accretion rate. It rescales the perfect Bondi case. (see e.g. Ali-Haimoud & Kamionkowski 2016) */
   double PBH_relative_velocities; /**< The relative velocities between PBH and baryons in km/s. If negative, the linear result is chosen by the code. */
+  double PBH_halo_profile_parameter; /**< //profile is proportional to r^(3-parameter). 0.75 represents bertschinger's seminal result. */
   enum PBH_accretion_recipe PBH_accretion_recipe; /**< recipe to compute accretion from PBH */
   enum energy_deposition_function energy_deposition_function; /**< Treatment of energy deposition in the medium following DM annihilation, decay, PBH evaporation etc. */
   short PBH_table_is_initialized; /**< Flag to specify if the PBH-mass evolution was calculated */
@@ -525,7 +527,7 @@ struct recombination {
   double * PBH_table_F; /**< Array of F(z)  given the redshift in 'PBH_table_z' */
   double * PBH_table_F_dd; /**< Array of the second derivative of F(z) w.r.t. the redshift */
   enum PBH_with_wimp_halo_models PBH_with_wimp_halo; /**< choice of modeling of the modified accretion rate including the formation of a WIMP halo around the PBH */
-
+  short PBH_stationarity_security; /** Enforce Lacc=Led if stationarity hypothesis is violated */
   double PBH_evaporating_mass; /**< initial mass from the PBH, in case of Dark Matter being low mass PBH */
   double PBH_fraction; /**< fraction of Dark Matter being PBH */
 

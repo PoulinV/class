@@ -2226,16 +2226,18 @@ int thermodynamics_accreting_pbh_energy_injection(
               // printf("%e %e\n",z,preco->r_b_eff_enhancement);
               r_B *= preco->r_b_eff_enhancement;
             }else if(preco->PBH_with_wimp_halo == analytical_halo){
-              p = 0.75;
+              p = preco->PBH_halo_profile_parameter;
               mHalo = 3000 * PBH_mass_at_z / (1+z);
+              mHalo = MIN(mHalo,preco->PBH_accreting_mass*(1/preco->PBH_fraction-1));//if preco->PBH_fraction = 1, there is no DM halo...
               rHalo = 19 * _Mpc_over_m_ / 1e6 / (1+z) * pow(mHalo,1./3.); //_Mpc_over_m_ / 1e6 converts from pc to meters.
               r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
-              if (rHalo < r_B){
+              if (rHalo < r_BH){
                 preco->r_b_eff_enhancement = r_BH/r_B;
               }else{
-                preco->r_b_eff_enhancement = r_BH*pow(r_BH/rHalo,p/(1-p))*pow(1/(1-p),1/(1-p));
+                preco->r_b_eff_enhancement = rHalo/r_B*pow((1-p)*rHalo/r_BH+p,1./(p-1.));
+                preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,1);
               }
-              printf("preco->r_b_eff_enhancement %e z %e\n",preco->r_b_eff_enhancement,z);
+              // printf("preco->r_b_eff_enhancement %e z %e\n",preco->r_b_eff_enhancement,z);
               r_B *= preco->r_b_eff_enhancement;
             }
             M_b_dot = 4*_PI_*lambda*rho*r_B*r_B*v_eff; //in kg s^-1
@@ -2352,22 +2354,22 @@ int thermodynamics_accreting_pbh_energy_injection(
             // printf("%e %e\n",z,preco->r_b_eff_enhancement);
             r_B *= preco->r_b_eff_enhancement;
           }else if(preco->PBH_with_wimp_halo == analytical_halo){
-            p = 0.75;
+            p = preco->PBH_halo_profile_parameter;
             mHalo = 3000 * PBH_mass_at_z / (1+z);
+            mHalo = MIN(mHalo,preco->PBH_accreting_mass*(1/preco->PBH_fraction-1));//if preco->PBH_fraction = 1, there is no DM halo...
+            // printf("mHalo %e max %e\n",mHalo,preco->PBH_accreting_mass/preco->PBH_fraction);
             rHalo = 19 * _Mpc_over_m_ / 1e6 / (1+z) * pow(mHalo,1./3.); //_Mpc_over_m_ / 1e6 converts from pc to meters.
             r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
             if (rHalo < r_BH){
+              // printf(" all the halo contributes! %e %e\n",  r_BH/r_B, z);
               preco->r_b_eff_enhancement = r_BH/r_B;
             }else{
-              preco->r_b_eff_enhancement = r_BH/r_B*pow(r_BH/rHalo,p/(1-p))*pow(1/(1-p),1/(1-p));
+              preco->r_b_eff_enhancement = rHalo/r_B*pow((1-p)*rHalo/r_BH+p,1/(p-1));
+              preco->r_b_eff_enhancement = MAX(preco->r_b_eff_enhancement,1.);
+              // printf(" only a fraction contributes! %e %e\n",  r_BH/r_B, z);
             }
-            if(preco->r_b_eff_enhancement<1)printf("warning: preco->r_b_eff_enhancement %e < 1 at z %e\n",preco->r_b_eff_enhancement,z);
-            // printf("r_BH/rHalo %e preco->r_b_eff_enhancement %e z %e\n",r_BH/rHalo,preco->r_b_eff_enhancement,z);
-            r_B = r_B*preco->r_b_eff_enhancement;
-            if(r_B/v_eff*pvecback[pba->index_bg_H]*(_c_ / _Mpc_over_m_) > 1){
-              if(pba->background_verbose > 5)printf("warning: the stationary hypothesis is not valid for Mpbh = %e Msun,i.e., rB*H/veff = %e > 1 at z = %e\n", PBH_mass_at_z, r_B/v_eff*pvecback[pba->index_bg_H]*(_c_ / _Mpc_over_m_),z);
-              r_B = r_B/preco->r_b_eff_enhancement;
-            }
+            preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,1);
+            r_B *= preco->r_b_eff_enhancement;
           }
           // printf("v_eff %e v_B %e vL %e \n",v_eff,v_B, 30*MIN(1,z/1000)*1e3);
           t_B = r_B / v_eff;// in s
@@ -2409,6 +2411,10 @@ int thermodynamics_accreting_pbh_energy_injection(
            L_acc = Boost_factor * L_ed; //in J/s
          }
 
+         if(r_B/v_eff*pvecback[pba->index_bg_H]*(_c_ / _Mpc_over_m_) > 1 && preco->PBH_stationarity_security == _TRUE_){
+           if(pba->background_verbose > 5)printf("warning: the stationary hypothesis is not valid for Mpbh = %e Msun,i.e., rB*H/veff = %e > 1 at z = %e\n", PBH_mass_at_z, r_B/v_eff*pvecback[pba->index_bg_H]*(_c_ / _Mpc_over_m_),z);
+           L_acc = L_ed;
+         }
 
          /* in J/m^3/s */
         *energy_rate =  (rho_cdm_today/(preco->PBH_accreting_mass*M_sun*_c_*_c_))*pow(1+z,3)*L_acc*preco->PBH_fraction;
@@ -4698,6 +4704,8 @@ int fill_recombination_structure(struct precision * ppr,
   preco->decay_fraction = pth->decay_fraction;
   preco->PBH_accreting_mass = pth->PBH_accreting_mass;
   preco->PBH_with_wimp_halo = pth->PBH_with_wimp_halo;
+  preco->PBH_halo_profile_parameter = pth->PBH_halo_profile_parameter;
+  preco->PBH_stationarity_security = pth->PBH_stationarity_security;
   preco->PBH_ADAF_delta = pth->PBH_ADAF_delta;
   preco->PBH_accretion_eigenvalue = pth->PBH_accretion_eigenvalue;
   preco->PBH_relative_velocities = pth->PBH_relative_velocities;
