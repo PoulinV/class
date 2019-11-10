@@ -30,7 +30,7 @@ AR        = ar rv
 # add a compilation option on the terminal command line:
 # "PYTHON=python3 make all" (THanks to Marius Millea for pyhton3
 # compatibility)
-PYTHON ?= python
+PYTHON ?= python2
 
 # your optimization flag
 OPTFLAG = -O4 -ffast-math #-march=native
@@ -52,8 +52,8 @@ HYREC = HyRec_2017
 
 
 # set to cosmorec, CosmoRec or COSMOREC to compile with CosmoRec
-#COSMOREC = 
-COSMOREC = $(PWD)/cosmorec_lite
+COSMOREC = 
+#COSMOREC = $(PWD)/cosmorec_lite
 GSL_LIB = /opt/local/lib/
 CC++ = g++-7
 
