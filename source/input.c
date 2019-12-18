@@ -1392,6 +1392,8 @@ int input_read_parameters(
 
   if(pth->PBH_accreting_mass>0. && pth->PBH_fraction>0){
 
+    class_read_double("PBH_fraction_security",pth->PBH_fraction_security);
+    class_test(pth->PBH_fraction>pow(pth->PBH_accreting_mass/0.88,-1.62)*pth->PBH_fraction_security,errmsg,"Your fraction of PBH is too high for CLASS to compute properly. the point is reject because way above the limit.")
     class_call(parser_read_string(pfc,"PBH_accretion_recipe",&string1,&flag1,errmsg),
                errmsg,
                errmsg);
@@ -3650,6 +3652,7 @@ int input_default_params(
   pth->PBH_accreting_mass = 0.;
   pth->PBH_evaporating_mass = 0.;
   pth->PBH_fraction = 0.;
+  pth->PBH_fraction_security = 1e30; //no such security by default
   pth->PBH_accretion_eigenvalue = 0.1; //Standard value in the ADAF scenario choose as benchmark.
   pth->PBH_relative_velocities = -1 ; //Standard value is the linear result extrapolated to PBH.
   pth->PBH_accretion_final_mass = 0;

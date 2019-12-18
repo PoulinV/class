@@ -282,6 +282,7 @@ double * reio_inter_xe; /**< discrete \f$ X_e(z)\f$ values */
   double * PBH_table_F_dd; /**< Array of the second derivative of F(z) w.r.t. the redshift */
 
   double PBH_fraction; /**< fraction of Dark Matter being PBH */
+  double PBH_fraction_security; /**< should the code crash above some fraction per security in MCMC? */
   double PBH_evaporating_mass; /**< mass from the PBH, in case of Dark Matter being low mass PBH */
   enum PBH_with_wimp_halo_models PBH_with_wimp_halo; /**< choice of modeling of the modified accretion rate including the formation of a WIMP halo around the PBH */
 
