@@ -364,8 +364,9 @@ int thermodynamics_init(
 	     pth->annihilation);
 
   class_test(pth->PBH_evaporating_mass > 0 && pth->PBH_evaporating_mass < 1e15 && pth->PBH_fraction > 1e-4,pth->error_message,
-	     "The value of 'pth->PBH_fraction' that you enter is suspicious given the mass you chose. You are several orders of magnitude above the limit. The code doesn't handle well too high energy injection. Please choose  'pth->PBH_fraction < 1e-4'. ")
- class_test(pth->PBH_fraction>pow(pth->PBH_accreting_mass/0.88,-1.62)*pth->PBH_fraction_security,pth->error_message,"Your fraction of PBH is too high for CLASS to compute properly. the point is reject because way above the limit.")
+	     "The value of 'pth->PBH_fraction' that you enter is suspicious given the mass you chose. You are several orders of magnitude above the limit. The code doesn't handle well too high energy injection. Please choose  'pth->PBH_fraction < 1e-4'. ");
+
+ class_test(pth->PBH_fraction>pow(pth->PBH_accreting_mass/0.88,-1.62)*pth->PBH_fraction_security,pth->error_message,"Your fraction of PBH is too high for CLASS to compute properly. the point is reject because way above the limit.");
 
     // class_test((pth->annihilation_f_halo>0) && (pth->recombination==recfast),
     //            pth->error_message,
