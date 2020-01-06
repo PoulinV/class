@@ -2357,12 +2357,14 @@ int thermodynamics_accreting_pbh_energy_injection(
             // printf("%e %e\n",z,preco->r_b_eff_enhancement);
             r_B *= preco->r_b_eff_enhancement;
           }else if(preco->PBH_with_wimp_halo == analytical_halo){
+
             p = preco->PBH_halo_profile_parameter;
             mHalo = 3000 * PBH_mass_at_z / (1+z);
             mHalo = MIN(mHalo,preco->PBH_accreting_mass*(1/preco->PBH_fraction-1));//if preco->PBH_fraction = 1, there is no DM halo...
             // printf("mHalo %e max %e\n",mHalo,preco->PBH_accreting_mass/preco->PBH_fraction);
             // rHalo = 19 * _Mpc_over_m_ / 1e6 / (1+z) * pow(mHalo,1./3.); //_Mpc_over_m_ / 1e6 converts from pc to meters. //A la Ricotti
             rHalo = 58 * _Mpc_over_m_ / 1e6 / (1+z) * pow(mHalo,1./3.); //_Mpc_over_m_ / 1e6 converts from pc to meters. //A la Pasquale            r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
+            r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
             if (rHalo < r_BH){
               // printf(" all the halo contributes! %e %e\n",  r_BH/r_B, z);
               preco->r_b_eff_enhancement = r_BH/r_B;
