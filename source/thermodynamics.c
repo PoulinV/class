@@ -2366,15 +2366,13 @@ int thermodynamics_accreting_pbh_energy_injection(
             rHalo = 58 * _Mpc_over_m_ / 1e6 / (1+z) * pow(mHalo,1./3.); //_Mpc_over_m_ / 1e6 converts from pc to meters. //A la Pasquale            r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
             r_BH = r_B*(PBH_mass_at_z+mHalo)/PBH_mass_at_z;
             if (rHalo < r_BH){
-              // printf(" all the halo contributes! %e %e\n",  r_BH/r_B, z);
               preco->r_b_eff_enhancement = r_BH/r_B;
             }else{
-              preco->r_b_eff_enhancement = rHalo/r_B*pow((1-p)*rHalo/r_BH+p,1/(p-1));
-              preco->r_b_eff_enhancement = MAX(preco->r_b_eff_enhancement,1.);
-              // printf(" only a fraction contributes! %e %e\n",  r_BH/r_B, z);
+              preco->r_b_eff_enhancement = rHalo/r_B*pow((1-p)*rHalo/r_BH+p,1./(p-1.));
+              preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,1);
             }
-            preco->r_b_eff_enhancement=MAX(preco->r_b_eff_enhancement,1);
             r_B *= preco->r_b_eff_enhancement;
+            // printf("z %e rb %e \n",z,preco->r_b_eff_enhancement);
           }
           // printf("v_eff %e v_B %e vL %e \n",v_eff,v_B, 30*MIN(1,z/1000)*1e3);
           t_B = r_B / v_eff;// in s

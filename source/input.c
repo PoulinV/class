@@ -1394,6 +1394,7 @@ int input_read_parameters(
 
     class_read_double("PBH_fraction_security",pth->PBH_fraction_security);
     class_test(pth->PBH_fraction>pow(pth->PBH_accreting_mass/0.88,-1.62)*pth->PBH_fraction_security,errmsg,"Your fraction of PBH is too high for CLASS to compute properly. the point is reject because way above the limit.")
+    // printf("%e\n", pow(pth->PBH_accreting_mass/0.88,-1.62));
     class_call(parser_read_string(pfc,"PBH_accretion_recipe",&string1,&flag1,errmsg),
                errmsg,
                errmsg);
